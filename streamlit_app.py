@@ -9,7 +9,7 @@ from typing import Annotated, List, TypedDict
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import StateGraph, END
-
+from PIL import Image
 
 logo = Image.open('picture.png')
 #newsize = (95, 95)
