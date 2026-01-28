@@ -24,6 +24,7 @@ with st.sidebar:
     st.header("Settings")
     api_key = st.secrets["open_ai_api_key"]
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
+    analyze_clicked = st.button("Analyze") # Moved and renamed button
     
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
@@ -127,7 +128,7 @@ graph = builder.compile()
 if not api_key:
     st.info("Please enter your OpenAI API Key in the sidebar.")
 else:
-    if st.button(f"Analyze {selected_ticker}"):
+    if analyze_clicked:
         with st.spinner("Analyzing Short, Medium, and Long-term horizons..."):
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             
