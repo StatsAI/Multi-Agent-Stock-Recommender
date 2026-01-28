@@ -58,7 +58,8 @@ def create_pdf(ticker, final_state):
             elif line.startswith('* ') or line.startswith('- '):
                 pdf.set_x(15)
                 pdf.cell(5, 5, chr(149), ln=0) # Bullet character
-                pdf.multi_cell(0, 5, line[2:].strip())
+                # Use a fixed width for the bullet text to ensure it stays within margins
+                pdf.multi_cell(180, 5, line[2:].strip())
             else:
                 pdf.multi_cell(0, 5, line)
 
