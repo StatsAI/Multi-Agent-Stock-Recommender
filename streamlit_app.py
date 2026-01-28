@@ -11,6 +11,7 @@ from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from PIL import Image
 from fpdf import FPDF
+import tempfile
 
 # --- PDF UTILITIES ---
 def clean_text_for_pdf(text):
@@ -28,17 +29,22 @@ def clean_text_for_pdf(text):
         text = text.replace(char, replacement)
     return text.encode('latin-1', 'ignore').decode('latin-1')
 
-def create_pdf(ticker, final_state):
+def create_pdf(ticker, final_state, charts):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
+    
+    # 1. Add Logo to top
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_logo:
+        logo.save(tmp_logo.name)
+        pdf.image(tmp_logo.name, x=10, y=8, w=30)
     
     # Title
     pdf.set_font("Helvetica", "B", 20)
     pdf.cell(0, 15, f"AI Wall Street Report: {ticker}", ln=True, align='C')
     pdf.set_draw_color(50, 50, 50)
-    pdf.line(10, 25, 200, 25)
-    pdf.ln(10)
+    pdf.line(10, 30, 200, 30)
+    pdf.ln(15)
     
     def write_formatted_content(text):
         lines = text.split('\n')
@@ -47,17 +53,14 @@ def create_pdf(ticker, final_state):
             if not line:
                 pdf.ln(2)
                 continue
-            
-            # Handle headers (###)
             if line.startswith('###'):
                 pdf.ln(3)
                 pdf.set_font("Helvetica", "B", 11)
                 pdf.cell(0, 8, line.replace('###', '').strip(), ln=True)
                 pdf.set_font("Helvetica", "", 10)
-            # Handle bullet points (* or -)
             elif line.startswith('* ') or line.startswith('- '):
                 pdf.set_x(15)
-                pdf.cell(5, 5, chr(149), ln=0) # Bullet character
+                pdf.cell(5, 5, chr(149), ln=0)
                 pdf.multi_cell(0, 5, line[2:].strip())
             else:
                 pdf.multi_cell(0, 5, line)
@@ -69,7 +72,18 @@ def create_pdf(ticker, final_state):
     pdf.ln(2)
     pdf.set_font("Helvetica", "", 10)
     write_formatted_content(clean_text_for_pdf(final_state['final_recommendation']))
-    pdf.ln(10)
+    pdf.ln(5)
+
+    # 2. Add Charts to Executive Summary
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, "Technical Market Context", ln=True)
+    
+    for i, fig in enumerate(charts):
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_chart:
+            fig.write_image(tmp_chart.name, width=800, height=400)
+            # Add image; if it hits bottom of page, FPDF handles break
+            pdf.image(tmp_chart.name, w=180)
+            pdf.ln(5)
     
     # Agent Sections
     reports = {
@@ -81,14 +95,12 @@ def create_pdf(ticker, final_state):
     }
     
     for title, key in reports.items():
-        # Section Header with Line Break
         pdf.set_draw_color(200, 200, 200)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(2)
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 10, title.upper(), ln=True)
         pdf.set_font("Helvetica", "", 10)
-        
         content = clean_text_for_pdf(final_state[key])
         write_formatted_content(content)
         pdf.ln(8)
@@ -265,12 +277,16 @@ else:
                 fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
                 return fig
 
+            chart1 = create_technical_chart(df_1d, "Short")
+            chart2 = create_technical_chart(df_1m, "Medium")
+            chart3 = create_technical_chart(df_1y, "Long", is_candle=False)
+
             st.caption("1-Day Intraday with SMA & RSI (Short)")
-            st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
+            st.plotly_chart(chart1, use_container_width=True)
             st.caption("1-Month Daily with SMA & RSI (Medium)")
-            st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
+            st.plotly_chart(chart2, use_container_width=True)
             st.caption("1-Year Daily with SMA & RSI (Long)")
-            st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
+            st.plotly_chart(chart3, use_container_width=True)
 
             div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
             summary = (f"TICKER: {selected_ticker}\n"
@@ -283,9 +299,10 @@ else:
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
 
-            # Store final state in session for PDF generation button
+            # Store final state and charts in session
             st.session_state['final_state'] = final_state
             st.session_state['ticker'] = selected_ticker
+            st.session_state['charts'] = [chart1, chart2, chart3]
 
             st.header("Executive Multi-Horizon Recommendation")
             st.markdown(final_state['final_recommendation'])
@@ -298,7 +315,7 @@ else:
 
     # Sidebar PDF Download Button
     if 'final_state' in st.session_state:
-        pdf_data = create_pdf(st.session_state['ticker'], st.session_state['final_state'])
+        pdf_data = create_pdf(st.session_state['ticker'], st.session_state['final_state'], st.session_state['charts'])
         st.sidebar.download_button(
             label="Download PDF Report",
             data=pdf_data,
