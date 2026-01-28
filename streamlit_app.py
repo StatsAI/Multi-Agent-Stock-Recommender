@@ -11,8 +11,6 @@ from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from PIL import Image
 from fpdf import FPDF
-from curl_cffi import requests
-  
 
 # --- PDF UTILITIES ---
 def clean_text_for_pdf(text):
@@ -150,9 +148,7 @@ with st.sidebar:
 
 # --- 2. DATA UTILITIES ---
 def get_financial_data(ticker):
-    session = requests.Session(impersonate="chrome")
-    stock = yf.Ticker(ticker, session=session)
-    #stock = yf.Ticker(ticker)
+    stock = yf.Ticker(ticker)
     df_1d = stock.history(period="1d", interval="1m")
     df_1m = stock.history(period="1mo", interval="1d")
     df_1y = stock.history(period="1y", interval="1d")
