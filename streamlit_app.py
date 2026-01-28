@@ -269,4 +269,4 @@ else:
             file_name=f"{st.session_state['ticker']}_Report.pdf",
             mime="application/pdf"
         )
-```
+
