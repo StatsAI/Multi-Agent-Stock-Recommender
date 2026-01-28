@@ -32,8 +32,6 @@ st.markdown(
 )
 
 with st.sidebar:
-    st.write('')
-	st.write('')
 	st.image(logo)
 
 st.markdown("""
