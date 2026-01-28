@@ -48,7 +48,7 @@ st.write('')
 # --- 1. SETTINGS & UI ---
 st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 
-st.title("🤖 Multi-Agent Quantitative Analysis Team")
+st.title("🤖 Multi-Agent AI Wall Street Team")
 st.markdown("""
 This app deploys a team of specialized AI agents. 
 The team analyzes **Short, Medium, and Long-term horizons** to provide a weighted recommendation.
