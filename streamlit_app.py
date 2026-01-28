@@ -65,17 +65,17 @@ async def fundamental_node(state: AgentState):
     return {"fundamental_report": res.content}
 
 async def technical_node(state: AgentState):
-    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze the short-term (intraday) and medium-term (daily) price action. Calculate virtual RSI/MACD based on the high/low/close data provided. Provide a concrete entry time and exit price. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze the short-term (5m) and medium-term (daily) price action. Calculate virtual RSI/MACD based on the high/low/close data provided. Provide a concrete entry time and exit price. Assign a Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"technical_report": res.content}
 
 async def ml_node(state: AgentState):
-    prompt = f"Act as an ML Analyst for {state['ticker']}. Evaluate price patterns across 1-day, 1-month, and 1-year horizons in the provided data summary. State the probability of a price increase tomorrow vs next week. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as an ML Analyst for {state['ticker']}. Evaluate price patterns across 5-day, 1-month, and 1-year horizons in the provided data summary. State the probability of a price increase tomorrow vs next week. Assign a Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"ml_report": res.content}
 
 async def forecasting_node(state: AgentState):
-    prompt = f"Act as a Time Series Forecasting Analyst. Look at the 1-year trend vs the intraday volatility for {state['ticker']}. Provide a specific price range for the next 48 hours and a forecast for the next 30 days. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as a Time Series Forecasting Analyst. Look at the 1-year trend vs the 5-day volatility for {state['ticker']}. Provide a specific price range for the next 48 hours and a forecast for the next 30 days. Assign a Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"forecasting_report": res.content}
 
@@ -120,10 +120,33 @@ else:
         with st.spinner("Analyzing Short, Medium, and Long-term horizons..."):
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             
-            # Charts Displayed Vertically
-            st.caption("1-Day Intraday (Short)")
-            fig1 = go.Figure(data=[go.Candlestick(x=df_1d.index, open=df_1d['Open'], high=df_1d['High'], low=df_1d['Low'], close=df_1d['Close'])])
-            fig1.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=400, margin=dict(l=0,r=0,b=0,t=0))
+            # --- Technical Indicators for 1-Day Chart ---
+            # SMA 20
+            df_1d['SMA20'] = df_1d['Close'].rolling(window=20).mean()
+            # RSI 14
+            delta = df_1d['Close'].diff()
+            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+            rs = gain / loss
+            df_1d['RSI'] = 100 - (100 / (1 + rs))
+
+            # --- Charts Displayed Vertically ---
+            st.caption("1-Day Intraday Candle with SMA & RSI (Short)")
+            
+            # Subplot simulation with Plotly
+            from plotly.subplots import make_subplots
+            fig1 = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+            
+            # Candlestick + SMA
+            fig1.add_trace(go.Candlestick(x=df_1d.index, open=df_1d['Open'], high=df_1d['High'], low=df_1d['Low'], close=df_1d['Close'], name="Price"), row=1, col=1)
+            fig1.add_trace(go.Scatter(x=df_1d.index, y=df_1d['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
+            
+            # RSI
+            fig1.add_trace(go.Scatter(x=df_1d.index, y=df_1d['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
+            fig1.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+            fig1.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+
+            fig1.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=600, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
             st.plotly_chart(fig1, use_container_width=True)
 
             st.caption("1-Month Candle (Medium)")
@@ -141,7 +164,7 @@ else:
             summary = (f"TICKER: {selected_ticker}\n"
                        f"INFO: P/E: {info.get('trailingPE')}, Mkt Cap: {info.get('marketCap')}, Div Yield: {info.get('dividendYield')}\n"
                        f"DIVIDENDS (Recent): {div_summary}\n"
-                       f"1D CLOSE: {df_1d['Close'].iloc[-1]:.2f}\n"
+                       f"CURRENT CLOSE: {df_1d['Close'].iloc[-1]:.2f}\n"
                        f"1M RANGE: {df_1m['Low'].min():.2f} - {df_1m['High'].max():.2f}\n"
                        f"1Y TREND: Start {df_1y['Close'].iloc[0]:.2f} to End {df_1y['Close'].iloc[-1]:.2f}")
 
