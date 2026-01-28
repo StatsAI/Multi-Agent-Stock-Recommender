@@ -110,12 +110,11 @@ st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 # --- CUSTOM CSS FOR BUTTON UNIFORMITY ---
 st.markdown("""
     <style>
-    /* Ensure sidebar buttons have consistent height and alignment */
     div[data-testid="stVerticalBlock"] > div:has(button) {
         align-items: stretch;
     }
     .stButton > button {
-        height: 3em; /* Sets a fixed height for both buttons */
+        height: 3em; 
         display: flex;
         align-items: center;
         justify-content: center;
@@ -163,13 +162,10 @@ with st.sidebar:
     api_key = st.secrets.get("open_ai_api_key", "")
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
     
-    # Updated Column Layout for Buttons
     col1, col2 = st.columns(2)
     with col1:
-        # use_container_width=True makes the button fill the half-column width
         analyze_clicked = st.button("Analyze", use_container_width=True) 
     with col2:
-        # use_container_width=True ensures symmetry
         if st.button("Clear Results", use_container_width=True):
             for key in ['final_state', 'ticker', 'df_1d', 'df_1m', 'df_1y']:
                 if key in st.session_state:
@@ -275,8 +271,6 @@ def create_technical_chart(df, title, is_candle=True):
     
     fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
-    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
     fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
     return fig
 
@@ -289,7 +283,6 @@ else:
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             df_1d, df_1m, df_1y = add_indicators(df_1d), add_indicators(df_1m), add_indicators(df_1y)
             
-            # Show charts immediately while agents run
             st.caption("1-Day Intraday with SMA & RSI (Short)")
             st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
             st.caption("1-Month Daily with SMA & RSI (Medium)")
@@ -304,7 +297,6 @@ else:
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
 
-            # Persist to session state
             st.session_state['final_state'] = final_state
             st.session_state['ticker'] = selected_ticker
             st.session_state['df_1d'] = df_1d
@@ -312,7 +304,6 @@ else:
             st.session_state['df_1y'] = df_1y
             st.rerun()
 
-    # Display results if they exist in session state (persistence)
     if 'final_state' in st.session_state and 'df_1d' in st.session_state:
         st.caption("1-Day Intraday with SMA & RSI (Short)")
         st.plotly_chart(create_technical_chart(st.session_state['df_1d'], "Short"), use_container_width=True)
@@ -337,5 +328,42 @@ else:
             data=pdf_data,
             file_name=f"{st.session_state['ticker']}_Report.pdf",
             mime="application/pdf",
-            use_container_width=True # Matched width for the download button too
+            use_container_width=True
         )
+        
+        # New Button: Explain how the app works
+        if st.sidebar.button("Explain how the app works", use_container_width=True):
+            st.divider()
+            st.subheader("How the AI Agent System Works")
+            
+            st.write("""
+            This application uses a **Multi-Agent Orchestration** pattern powered by **LangGraph**. 
+            Instead of a single AI trying to do everything, the task is split among specialized 
+            'agents' that operate in parallel before reporting to a supervisor.
+            """)
+
+            st.mermaid("""
+            graph TD
+                Start((Start)) --> Fundamental[Fundamental Agent]
+                Start --> Technical[Technical Agent]
+                Start --> ML[ML Pattern Agent]
+                Start --> Forecast[Time-Series Agent]
+                Start --> News[Sentiment Agent]
+                
+                Fundamental --> Supervisor{CIO Supervisor}
+                Technical --> Supervisor
+                ML --> Supervisor
+                Forecast --> Supervisor
+                News --> Supervisor
+                
+                Supervisor --> Final([Final Investment Report])
+            """)
+
+            st.markdown("""
+            ### End-to-End Process:
+            1. **Data Ingestion**: The app fetches real-time market data from YFinance, calculating technical indicators like **SMA** and **RSI**.
+            2. **Parallel Processing**: Five specialized agents receive the data summary simultaneously. Each agent has a unique "System Prompt" that forces it to look at the market through a specific lens (e.g., the ML Agent looks for patterns, while the News Agent looks at macro sentiment).
+            3. **State Management**: LangGraph maintains a shared 'AgentState' dictionary, where each agent writes its specific report.
+            4. **Synthesis**: The **Supervisor Agent** (acting as a Chief Investment Officer) waits for all parallel reports to finish. It then synthesizes the conflicting or supporting data into a single, cohesive recommendation across four time horizons.
+            5. **Output**: The results are rendered as interactive Plotly charts, a detailed dashboard, and a downloadable PDF report generated via ReportLab.
+            """)
