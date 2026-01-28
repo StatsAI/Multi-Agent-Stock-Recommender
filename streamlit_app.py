@@ -10,85 +10,79 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from PIL import Image
-from fpdf import FPDF
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from io import BytesIO
 
 # --- PDF UTILITIES ---
-def clean_text_for_pdf(text):
-    """Replaces common unicode characters that cause Helvetica to crash."""
-    replacements = {
-        '\u2013': '-', # en dash
-        '\u2014': '-', # em dash
-        '\u2018': "'", # left single quote
-        '\u2019': "'", # right single quote
-        '\u201c': '"', # left double quote
-        '\u201d': '"', # right double quote
-        '\u2022': '*', # bullet point
-    }
-    for char, replacement in replacements.items():
-        text = text.replace(char, replacement)
-    return text.encode('latin-1', 'ignore').decode('latin-1')
-
 def create_pdf(ticker, final_state):
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    pdf.add_page()
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter,
+                           rightMargin=72, leftMargin=72,
+                           topMargin=72, bottomMargin=18)
+    
+    # Container for the 'Flowable' objects
+    elements = []
+    
+    # Define styles
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='CustomTitle', 
+                             parent=styles['Heading1'],
+                             fontSize=24,
+                             textColor='black',
+                             spaceAfter=30,
+                             alignment=TA_CENTER))
+    styles.add(ParagraphStyle(name='SectionHeader',
+                             parent=styles['Heading2'],
+                             fontSize=14,
+                             textColor='black',
+                             spaceAfter=12,
+                             spaceBefore=12,
+                             backColor='#f0f0f0'))
     
     # Title
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.cell(0, 15, f"AI Wall Street Report: {ticker}", ln=True, align='C')
-    pdf.set_draw_color(50, 50, 50)
-    pdf.line(10, 25, 200, 25)
-    pdf.ln(10)
+    title = Paragraph(f"AI Wall Street Report: {ticker}", styles['CustomTitle'])
+    elements.append(title)
+    elements.append(Spacer(1, 12))
     
-    def write_formatted_content(text):
-        lines = text.split('\n')
-        for line in lines:
-            line = line.strip()
-            if not line:
-                pdf.ln(2)
-                continue
-            
-            # Handle headers (###)
-            if line.startswith('###'):
-                pdf.ln(3)
-                pdf.set_font("Helvetica", "B", 11)
-                pdf.cell(0, 8, line.replace('###', '').strip(), ln=True)
-                pdf.set_font("Helvetica", "", 10)
-            else:
-                pdf.multi_cell(0, 5, line)
-
-    # Section: Executive Recommendation
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(0, 10, " EXECUTIVE MULTI-HORIZON RECOMMENDATION", ln=True, fill=True)
-    pdf.ln(2)
-    pdf.set_font("Helvetica", "", 10)
-    write_formatted_content(clean_text_for_pdf(final_state['final_recommendation']))
-    pdf.ln(10)
+    # Executive Recommendation Section
+    exec_header = Paragraph("EXECUTIVE MULTI-HORIZON RECOMMENDATION", styles['SectionHeader'])
+    elements.append(exec_header)
+    
+    exec_text = final_state['final_recommendation'].replace('\n', '<br/>')
+    exec_para = Paragraph(exec_text, styles['BodyText'])
+    elements.append(exec_para)
+    elements.append(Spacer(1, 20))
     
     # Agent Sections
     reports = {
-        "Fundamental Analysis": 'fundamental_report',
-        "Technical Analysis": 'technical_report',
-        "ML Analysis": 'ml_report',
-        "Forecasting Analysis": 'forecasting_report',
-        "News & Sentiment": 'news_report'
+        "FUNDAMENTAL ANALYSIS": 'fundamental_report',
+        "TECHNICAL ANALYSIS": 'technical_report',
+        "ML ANALYSIS": 'ml_report',
+        "FORECASTING ANALYSIS": 'forecasting_report',
+        "NEWS & SENTIMENT": 'news_report'
     }
     
     for title, key in reports.items():
-        # Section Header with Line Break
-        pdf.set_draw_color(200, 200, 200)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
-        pdf.ln(2)
-        pdf.set_font("Helvetica", "B", 12)
-        pdf.cell(0, 10, title.upper(), ln=True)
-        pdf.set_font("Helvetica", "", 10)
+        section_header = Paragraph(title, styles['SectionHeader'])
+        elements.append(section_header)
         
-        content = clean_text_for_pdf(final_state[key])
-        write_formatted_content(content)
-        pdf.ln(8)
-        
-    return bytes(pdf.output())
+        content = final_state[key].replace('\n', '<br/>')
+        section_para = Paragraph(content, styles['BodyText'])
+        elements.append(section_para)
+        elements.append(Spacer(1, 20))
+    
+    # Build PDF
+    doc.build(elements)
+    
+    # Get the value of the BytesIO buffer
+    pdf_data = buffer.getvalue()
+    buffer.close()
+    
+    return pdf_data
 
 logo = Image.open('picture.png')
 
