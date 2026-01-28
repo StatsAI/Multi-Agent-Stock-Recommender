@@ -13,7 +13,7 @@ from PIL import Image
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Image as RLImage
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
 import re
@@ -48,6 +48,12 @@ def create_pdf(ticker, final_state):
                              leftIndent=20,
                              bulletIndent=10,
                              spaceAfter=6))
+    
+    # Add Logo (centered)
+    logo = RLImage('picture.png', width=2*inch, height=2*inch)
+    logo.hAlign = 'CENTER'
+    elements.append(logo)
+    elements.append(Spacer(1, 12))
     
     # Title
     title = Paragraph(f"AI Wall Street Report: {ticker}", styles['CustomTitle'])
