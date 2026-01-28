@@ -154,7 +154,7 @@ st.markdown("""
 
 st.title("🤖 Multi-Agent AI Wall Street Team 🚀🌕")
 st.markdown("""
-This app use LangGraph to create a team of specialized AI agents running in parallel reporting to a supervisor agent.  
+This app uses LangGraph to create a team of specialized AI agents running in parallel reporting to a supervisor agent.  
 """)
 
 # Sidebar for Configuration
