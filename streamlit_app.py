@@ -52,13 +52,13 @@ def create_pdf(ticker, final_state):
             if line.startswith('###'):
                 pdf.ln(3)
                 pdf.set_font("Helvetica", "B", 11)
-                pdf.cell(0, 8, line.replace('###', '').strip(), ln=True)
+                pdf.multi_cell(0, 8, line.replace('###', '').strip())
                 pdf.set_font("Helvetica", "", 10)
             # Handle bullet points (* or -)
             elif line.startswith('* ') or line.startswith('- '):
                 pdf.set_x(15)
-                pdf.cell(5, 5, chr(149), ln=0) # Bullet character
-                pdf.multi_cell(0, 5, line[2:].strip())
+                # Fixed: Use multi_cell for the whole bullet line to avoid horizontal space issues
+                pdf.multi_cell(0, 5, f"- {line[2:].strip()}")
             else:
                 pdf.multi_cell(0, 5, line)
 
@@ -81,7 +81,6 @@ def create_pdf(ticker, final_state):
     }
     
     for title, key in reports.items():
-        # Section Header with Line Break
         pdf.set_draw_color(200, 200, 200)
         pdf.line(10, pdf.get_y(), 200, pdf.get_y())
         pdf.ln(2)
@@ -283,7 +282,6 @@ else:
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
 
-            # Store final state in session for PDF generation button
             st.session_state['final_state'] = final_state
             st.session_state['ticker'] = selected_ticker
 
@@ -296,7 +294,6 @@ else:
             for i, tab in enumerate(tabs):
                 with tab: st.write(final_state[reports[i]])
 
-    # Sidebar PDF Download Button
     if 'final_state' in st.session_state:
         pdf_data = create_pdf(st.session_state['ticker'], st.session_state['final_state'])
         st.sidebar.download_button(
