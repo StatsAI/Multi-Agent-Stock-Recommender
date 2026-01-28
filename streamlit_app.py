@@ -342,7 +342,8 @@ else:
             'agents' that operate in parallel before reporting to a supervisor.
             """)
 
-            st.mermaid("""
+            st.markdown("""
+            ```mermaid
             graph TD
                 Start((Start)) --> Fundamental[Fundamental Agent]
                 Start --> Technical[Technical Agent]
@@ -357,6 +358,7 @@ else:
                 News --> Supervisor
                 
                 Supervisor --> Final([Final Investment Report])
+            ```
             """)
 
             st.markdown("""
