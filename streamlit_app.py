@@ -268,4 +268,42 @@ else:
                     if is_candle:
                         fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Price"), row=1, col=1)
                     else:
-                        fig.add_trace(go.Scatter(x=df.index, y=df['Close
+                        fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', line=dict(color='cyan'), name="Price"), row=1, col=1)
+                    
+                    fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
+                    fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
+                    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+                    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+                    fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
+                    return fig
+
+                st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
+                st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
+                st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
+
+                div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
+                summary = (f"TICKER: {selected_ticker}\n"
+                           f"SOURCE: {data_source}\n"
+                           f"INFO: P/E: {info.get('trailingPE')}, Mkt Cap: {info.get('marketCap')}\n"
+                           f"CURRENT CLOSE: {df_1d['Close'].iloc[-1]:.2f}")
+
+                initial_state = {"ticker": selected_ticker, "data_summary": summary}
+                final_state = asyncio.run(graph.ainvoke(initial_state))
+
+                st.session_state['final_state'] = final_state
+                st.session_state['ticker'] = selected_ticker
+
+                st.header("Executive Multi-Horizon Recommendation")
+                st.markdown(final_state['final_recommendation'])
+                
+                st.divider()
+                tabs = st.tabs(["Fundamental", "Technical", "ML", "Forecasting", "News"])
+                reports = ['fundamental_report', 'technical_report', 'ml_report', 'forecasting_report', 'news_report']
+                for i, tab in enumerate(tabs):
+                    with tab: st.write(final_state[reports[i]])
+        except Exception as e:
+            st.error(f"Error fetching data: {e}. Try a different ticker or wait a few minutes.")
+
+    if 'final_state' in st.session_state:
+        pdf_data = create_pdf(st.session_state['ticker'], st.session_state['final_state'])
+        st.sidebar.download_button(label="Download PDF Report", data=pdf_data, file_name=f"{st.session_state['ticker']}_Report.pdf", mime="application/pdf")
