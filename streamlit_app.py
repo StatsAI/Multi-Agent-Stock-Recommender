@@ -23,7 +23,7 @@ st.markdown(
             display: block;
             margin-left: auto;
             margin-right: auto;
-	    margin-top: -100px;
+	    margin-top: -75px;
             width: 100%;
 	    #margin: 0;	         		
         }
@@ -32,7 +32,9 @@ st.markdown(
 )
 
 with st.sidebar:
-    st.image(logo)
+    st.write('')
+	st.write('')
+	st.image(logo)
 
 st.markdown("""
         <style>
