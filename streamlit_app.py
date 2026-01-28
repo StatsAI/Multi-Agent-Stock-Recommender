@@ -10,6 +10,41 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 
+
+logo = Image.open('picture.png')
+#newsize = (95, 95)
+#logo = logo.resize(newsize)
+
+st.markdown(
+    """
+    <style>
+        [data-testid=stSidebar] [data-testid=stImage]{
+            text-align: center;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+	    margin-top: -75px;
+            width: 100%;
+	    #margin: 0;	         		
+        }
+    </style>
+    """, unsafe_allow_html=True
+)
+
+with st.sidebar:
+    st.image(logo)
+
+st.markdown("""
+        <style>
+               .block-container {
+		    padding-top: 0;
+                }
+        </style>
+        """, unsafe_allow_html=True)
+
+st.write('')
+st.write('')
+
 # --- 1. SETTINGS & UI ---
 st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 
