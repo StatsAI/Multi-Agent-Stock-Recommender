@@ -58,8 +58,7 @@ def create_pdf(ticker, final_state):
             elif line.startswith('* ') or line.startswith('- '):
                 pdf.set_x(15)
                 pdf.cell(5, 5, chr(149), ln=0) # Bullet character
-                pdf.set_x(20)  # Reset X position for the text after bullet
-                pdf.multi_cell(0, 5, line[2:].strip())
+                pdf.multi_cell(175, 5, line[2:].strip())
             else:
                 pdf.multi_cell(0, 5, line)
 
