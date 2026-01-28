@@ -29,15 +29,21 @@ def clean_text_for_pdf(text):
     return text.encode('latin-1', 'ignore').decode('latin-1')
 
 def create_pdf(ticker, final_state):
-    pdf = FPDF()
+    # Initialize with explicit orientation and units
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     
+    # Explicitly set margins to prevent calculation errors
+    pdf.set_left_margin(15)
+    pdf.set_right_margin(15)
+    effective_width = 210 - 30 # A4 width (210) minus margins (15+15)
+
     # Title
     pdf.set_font("Helvetica", "B", 20)
     pdf.cell(0, 15, f"AI Wall Street Report: {ticker}", ln=True, align='C')
     pdf.set_draw_color(50, 50, 50)
-    pdf.line(10, 25, 200, 25)
+    pdf.line(15, 25, 195, 25)
     pdf.ln(10)
     
     def write_formatted_content(text):
@@ -52,14 +58,16 @@ def create_pdf(ticker, final_state):
             if line.startswith('###'):
                 pdf.ln(3)
                 pdf.set_font("Helvetica", "B", 11)
-                pdf.multi_cell(0, 8, line.replace('###', '').strip())
+                pdf.multi_cell(0, 6, line.replace('###', '').strip())
                 pdf.set_font("Helvetica", "", 10)
             # Handle bullet points (* or -)
             elif line.startswith('* ') or line.startswith('- '):
-                pdf.set_x(15)
-                # Fixed: Use multi_cell for the whole bullet line to avoid horizontal space issues
-                pdf.multi_cell(0, 5, f"- {line[2:].strip()}")
+                pdf.set_font("Helvetica", "", 10)
+                # Fixed: Use a string prefix instead of set_x to keep the width calculation stable
+                bullet_text = f"  - {line[2:].strip()}"
+                pdf.multi_cell(0, 5, bullet_text)
             else:
+                pdf.set_font("Helvetica", "", 10)
                 pdf.multi_cell(0, 5, line)
 
     # Section: Executive Recommendation
@@ -67,7 +75,6 @@ def create_pdf(ticker, final_state):
     pdf.set_fill_color(240, 240, 240)
     pdf.cell(0, 10, " EXECUTIVE MULTI-HORIZON RECOMMENDATION", ln=True, fill=True)
     pdf.ln(2)
-    pdf.set_font("Helvetica", "", 10)
     write_formatted_content(clean_text_for_pdf(final_state['final_recommendation']))
     pdf.ln(10)
     
@@ -81,12 +88,15 @@ def create_pdf(ticker, final_state):
     }
     
     for title, key in reports.items():
+        # Check for page overflow before drawing line
+        if pdf.get_y() > 260:
+            pdf.add_page()
+            
         pdf.set_draw_color(200, 200, 200)
-        pdf.line(10, pdf.get_y(), 200, pdf.get_y())
+        pdf.line(15, pdf.get_y(), 195, pdf.get_y())
         pdf.ln(2)
         pdf.set_font("Helvetica", "B", 12)
         pdf.cell(0, 10, title.upper(), ln=True)
-        pdf.set_font("Helvetica", "", 10)
         
         content = clean_text_for_pdf(final_state[key])
         write_formatted_content(content)
@@ -94,6 +104,7 @@ def create_pdf(ticker, final_state):
         
     return bytes(pdf.output())
 
+# --- Rest of the Streamlit App (Unchanged) ---
 logo = Image.open('picture.png')
 
 st.markdown(
