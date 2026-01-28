@@ -3,7 +3,7 @@
 # What it does: 🤖 Multi-Agent AI Wall Street Team 🚀🌕
 
 # How it works: 
-## 1. This app use LangGraph to create a team of specialized AI agents running in parallel reporting to a supervisor agent.
+## 1. This app uses LangGraph to create a team of specialized AI agents running in parallel reporting to a supervisor agent.
 ## 2. The team analyzes short, medium, and long-term horizons to provide a weighted recommendation to buy/hold/sell.
 ## 3. Pressing the download pdf report auto generates and downloads a pdf report, enabling further review!
 ## 4. Pressing the explainer button auto generates an explanation of how the AI system works along with an architecture diagram!
