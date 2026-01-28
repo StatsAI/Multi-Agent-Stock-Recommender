@@ -3,6 +3,7 @@ import os
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import asyncio
 from typing import Annotated, List, TypedDict
 from langchain_openai import ChatOpenAI
@@ -44,6 +45,16 @@ def get_financial_data(ticker):
     dividends = stock.dividends
     
     return df_1d, df_1m, df_1y, info, dividends
+
+def add_indicators(df):
+    """Calculates SMA20 and RSI14."""
+    df['SMA20'] = df['Close'].rolling(window=20).mean()
+    delta = df['Close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    df['RSI'] = 100 - (100 / (1 + rs))
+    return df
 
 # --- 3. LANGGRAPH AGENT STATE ---
 class AgentState(TypedDict):
@@ -120,44 +131,35 @@ else:
         with st.spinner("Analyzing Short, Medium, and Long-term horizons..."):
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             
-            # --- Technical Indicators for 1-Day Chart ---
-            # SMA 20
-            df_1d['SMA20'] = df_1d['Close'].rolling(window=20).mean()
-            # RSI 14
-            delta = df_1d['Close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / loss
-            df_1d['RSI'] = 100 - (100 / (1 + rs))
+            # Apply indicators to all dataframes
+            df_1d = add_indicators(df_1d)
+            df_1m = add_indicators(df_1m)
+            df_1y = add_indicators(df_1y)
 
-            # --- Charts Displayed Vertically ---
-            st.caption("1-Day Intraday Candle with SMA & RSI (Short)")
-            
-            # Subplot simulation with Plotly
-            from plotly.subplots import make_subplots
-            fig1 = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-            
-            # Candlestick + SMA
-            fig1.add_trace(go.Candlestick(x=df_1d.index, open=df_1d['Open'], high=df_1d['High'], low=df_1d['Low'], close=df_1d['Close'], name="Price"), row=1, col=1)
-            fig1.add_trace(go.Scatter(x=df_1d.index, y=df_1d['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
-            
-            # RSI
-            fig1.add_trace(go.Scatter(x=df_1d.index, y=df_1d['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
-            fig1.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-            fig1.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+            # --- Chart Rendering Helper ---
+            def create_technical_chart(df, title, is_candle=True):
+                fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+                if is_candle:
+                    fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Price"), row=1, col=1)
+                else:
+                    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', line=dict(color='cyan'), name="Price"), row=1, col=1)
+                
+                fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
+                fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
+                fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+                fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+                fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
+                return fig
 
-            fig1.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=600, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
-            st.plotly_chart(fig1, use_container_width=True)
+            # --- Display Charts Vertically ---
+            st.caption("1-Day Intraday with SMA & RSI (Short)")
+            st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
 
-            st.caption("1-Month Candle (Medium)")
-            fig2 = go.Figure(data=[go.Candlestick(x=df_1m.index, open=df_1m['Open'], high=df_1m['High'], low=df_1m['Low'], close=df_1m['Close'])])
-            fig2.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=400, margin=dict(l=0,r=0,b=0,t=0))
-            st.plotly_chart(fig2, use_container_width=True)
+            st.caption("1-Month Daily with SMA & RSI (Medium)")
+            st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
 
-            st.caption("1-Year Line (Long)")
-            fig3 = go.Figure(data=[go.Scatter(x=df_1y.index, y=df_1y['Close'], mode='lines', line=dict(color='cyan'))])
-            fig3.update_layout(template="plotly_dark", height=400, margin=dict(l=0,r=0,b=0,t=0))
-            st.plotly_chart(fig3, use_container_width=True)
+            st.caption("1-Year Daily with SMA & RSI (Long)")
+            st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
 
             # Data Preparation for Agents
             div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
