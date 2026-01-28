@@ -42,6 +42,9 @@ def create_pdf(ticker, final_state):
     
     def write_formatted_content(text):
         lines = text.split('\n')
+        # Calculate available width (Page width - margins)
+        effective_page_width = pdf.w - 2 * pdf.l_margin
+        
         for line in lines:
             line = line.strip()
             if not line:
@@ -58,7 +61,9 @@ def create_pdf(ticker, final_state):
             elif line.startswith('* ') or line.startswith('- '):
                 pdf.set_x(15)
                 pdf.cell(5, 5, chr(149), ln=0) # Bullet character
-                pdf.multi_cell(0, 5, line[2:].strip())
+                # Use explicit width to avoid "not enough space" error
+                pdf.multi_cell(effective_page_width - 10, 5, line[2:].strip())
+                pdf.set_x(10) # Reset x to default margin
             else:
                 pdf.multi_cell(0, 5, line)
 
