@@ -100,7 +100,8 @@ graph = builder.compile()
 st.title("⚡ 60-Second Stock Intelligence")
 
 with st.sidebar:
-    api_key = st.text_input("OpenAI API Key", type="password")
+    #api_key = st.text_input("OpenAI API Key", type="password")
+    api_key = st.secrets["open_ai_api_key"]
     ticker = st.text_input("Ticker", value="AAPL").upper()
     if api_key: os.environ["OPENAI_API_KEY"] = api_key
 
