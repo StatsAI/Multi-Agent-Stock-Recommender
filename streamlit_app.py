@@ -146,11 +146,13 @@ with st.sidebar:
     st.header("Settings")
     api_key = st.secrets.get("open_ai_api_key", "")
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
+    
+    # Using columns with use_container_width for equal button sizes
     col1, col2 = st.columns(2)
     with col1:
-        analyze_clicked = st.button("Analyze") 
+        analyze_clicked = st.button("Analyze", use_container_width=True) 
     with col2:
-        if st.button("Clear Results"):
+        if st.button("Clear Results", use_container_width=True):
             for key in ['final_state', 'ticker', 'df_1d', 'df_1m', 'df_1y']:
                 if key in st.session_state:
                     del st.session_state[key]
@@ -265,10 +267,18 @@ if not api_key:
     st.info("Please enter your OpenAI API Key in the sidebar.")
 else:
     if analyze_clicked:
-        with st.spinner("Synthesizing multi-horizon recommendations..."):
+        with st.spinner("Fetching data and generating charts..."):
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             df_1d, df_1m, df_1y = add_indicators(df_1d), add_indicators(df_1m), add_indicators(df_1y)
+            
+            st.caption("1-Day Intraday with SMA & RSI (Short)")
+            st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
+            st.caption("1-Month Daily with SMA & RSI (Medium)")
+            st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
+            st.caption("1-Year Daily with SMA & RSI (Long)")
+            st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
 
+        with st.spinner("Synthesizing multi-horizon recommendations..."):
             summary = (f"TICKER: {selected_ticker}\n"
                        f"CURRENT CLOSE: {df_1d['Close'].iloc[-1]:.2f}")
 
@@ -280,6 +290,7 @@ else:
             st.session_state['df_1d'] = df_1d
             st.session_state['df_1m'] = df_1m
             st.session_state['df_1y'] = df_1y
+            st.rerun()
 
     if 'final_state' in st.session_state and 'df_1d' in st.session_state:
         st.caption("1-Day Intraday with SMA & RSI (Short)")
@@ -304,5 +315,6 @@ else:
             label="Download PDF Report",
             data=pdf_data,
             file_name=f"{st.session_state['ticker']}_Report.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
+            use_container_width=True
         )
