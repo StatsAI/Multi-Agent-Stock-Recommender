@@ -331,41 +331,46 @@ else:
             use_container_width=True
         )
         
-        # New Button: Explain how the app works
         if st.sidebar.button("Explain how the app works", use_container_width=True):
             st.divider()
-            st.subheader("How the AI Agent System Works")
+            st.subheader("The Agentic Team Brainstorm")
             
             st.write("""
-            This application uses a **Multi-Agent Orchestration** pattern powered by **LangGraph**. 
-            Instead of a single AI trying to do everything, the task is split among specialized 
-            'agents' that operate in parallel before reporting to a supervisor.
+            Instead of a rigid flowchart, imagine a **Command Center**. When you click 'Analyze', 
+            the system launches five specialized 'analysts' into a virtual room.
             """)
 
+            # Hand-drawn style visualization
             st.markdown("""
-            ```mermaid
-            graph TD
-                Start((Start)) --> Fundamental[Fundamental Agent]
-                Start --> Technical[Technical Agent]
-                Start --> ML[ML Pattern Agent]
-                Start --> Forecast[Time-Series Agent]
-                Start --> News[Sentiment Agent]
-                
-                Fundamental --> Supervisor{CIO Supervisor}
-                Technical --> Supervisor
-                ML --> Supervisor
-                Forecast --> Supervisor
-                News --> Supervisor
-                
-                Supervisor --> Final([Final Investment Report])
+            ```text
+            [ HAND-DRAWN VISUALIZATION CONCEPT ]
+            
+                 ( MARKET DATA FEED )
+                          |
+            /-----------------------------\ 
+            |  [AGENT]      [AGENT]       |
+            | Fundamental   Technical     |  <-- Parallel Execution
+            |                             |
+            |  [AGENT]      [AGENT]       |
+            |    ML         Forecast      |
+            |            +                |
+            |        [AGENT] News         |
+            \-------------+---------------/
+                          |
+                          v
+                { SUPERVISOR NODE / CIO }
+                 "Synthesizes the chaos"
+                          |
+                          v
+               ( FINAL PDF & DASHBOARD )
             ```
             """)
 
             st.markdown("""
-            ### End-to-End Process:
-            1. **Data Ingestion**: The app fetches real-time market data from YFinance, calculating technical indicators like **SMA** and **RSI**.
-            2. **Parallel Processing**: Five specialized agents receive the data summary simultaneously. Each agent has a unique "System Prompt" that forces it to look at the market through a specific lens (e.g., the ML Agent looks for patterns, while the News Agent looks at macro sentiment).
-            3. **State Management**: LangGraph maintains a shared 'AgentState' dictionary, where each agent writes its specific report.
-            4. **Synthesis**: The **Supervisor Agent** (acting as a Chief Investment Officer) waits for all parallel reports to finish. It then synthesizes the conflicting or supporting data into a single, cohesive recommendation across four time horizons.
-            5. **Output**: The results are rendered as interactive Plotly charts, a detailed dashboard, and a downloadable PDF report generated via ReportLab.
+            ### End-to-End Workflow:
+            1. **Raw Data Extraction**: Real-time candle data and financial metrics are pulled for your ticker.
+            2. **Asynchronous Analysis**: Five separate AI prompts are fired simultaneously. Using `asyncio`, we don't wait for the Fundamental agent to finish before starting the Technical agent—they all work at once to save time.
+            3. **The Shared 'Blackboard'**: Every agent contributes their findings to a shared state.
+            4. **The CIO Review**: The Supervisor agent reads all five reports. Its job is to spot contradictions (e.g., Technical says 'Sell' but ML says 'Buy') and provide a final, reasoned verdict.
+            5. **The Report Generation**: Results are converted into interactive Plotly charts and a formatted PDF for professional use.
             """)
