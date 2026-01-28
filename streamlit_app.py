@@ -103,7 +103,7 @@ with st.sidebar:
     #api_key = st.text_input("OpenAI API Key", type="password")
     api_key = st.secrets["open_ai_api_key"]
     ticker = st.text_input("Ticker", value="AAPL").upper()
-    if api_key: os.environ["OPENAI_API_KEY"] = api_key
+    os.environ["OPENAI_API_KEY"] = api_key
 
 if st.button("Generate Report") and api_key:
     with st.spinner("Executing parallel analysis..."):
