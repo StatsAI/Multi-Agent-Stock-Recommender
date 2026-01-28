@@ -25,10 +25,7 @@ def create_pdf(ticker, final_state):
                            rightMargin=72, leftMargin=72,
                            topMargin=72, bottomMargin=18)
     
-    # Container for the 'Flowable' objects
     elements = []
-    
-    # Define styles
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(name='CustomTitle', 
                              parent=styles['Heading1'],
@@ -49,55 +46,45 @@ def create_pdf(ticker, final_state):
                              bulletIndent=10,
                              spaceAfter=6))
     
-    # Add Logo (centered)
-    logo = RLImage('picture.png', width=2*inch, height=2*inch)
-    logo.hAlign = 'CENTER'
-    elements.append(logo)
-    elements.append(Spacer(1, 12))
+    try:
+        logo = RLImage('picture.png', width=2*inch, height=2*inch)
+        logo.hAlign = 'CENTER'
+        elements.append(logo)
+        elements.append(Spacer(1, 12))
+    except:
+        pass
     
-    # Title
     title = Paragraph(f"AI Wall Street Report: {ticker}", styles['CustomTitle'])
     elements.append(title)
     elements.append(Spacer(1, 12))
     
     def format_bold(text):
-        """Convert **text** to <b>text</b> for reportlab"""
         return re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
     
     def format_content(content):
-        """Convert content with bullet points and bold text to proper formatting"""
         lines = content.split('\n')
         formatted_elements = []
-        
         for line in lines:
             line = line.strip()
             if not line:
                 formatted_elements.append(Spacer(1, 6))
                 continue
-            
-            # Apply bold formatting
             line = format_bold(line)
-            
-            # Handle headers (###)
             if line.startswith('###'):
                 header_text = line.replace('###', '').strip()
                 formatted_elements.append(Paragraph(f"<b>{header_text}</b>", styles['BodyText']))
-            # Handle bullet points
             elif line.startswith('* ') or line.startswith('- '):
                 bullet_text = line[2:].strip()
                 formatted_elements.append(Paragraph(f"• {bullet_text}", styles['BulletPoint']))
             else:
                 formatted_elements.append(Paragraph(line, styles['BodyText']))
-        
         return formatted_elements
     
-    # Executive Recommendation Section
     exec_header = Paragraph("EXECUTIVE MULTI-HORIZON RECOMMENDATION", styles['SectionHeader'])
     elements.append(exec_header)
     elements.extend(format_content(final_state['final_recommendation']))
     elements.append(Spacer(1, 20))
     
-    # Agent Sections
     reports = {
         "FUNDAMENTAL ANALYSIS": 'fundamental_report',
         "TECHNICAL ANALYSIS": 'technical_report',
@@ -112,34 +99,34 @@ def create_pdf(ticker, final_state):
         elements.extend(format_content(final_state[key]))
         elements.append(Spacer(1, 20))
     
-    # Build PDF
     doc.build(elements)
-    
-    # Get the value of the BytesIO buffer
     pdf_data = buffer.getvalue()
     buffer.close()
-    
     return pdf_data
 
-logo = Image.open('picture.png')
+# Set page config
+st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 
-st.markdown(
-    """
-    <style>
-        [data-testid=stSidebar] [data-testid=stImage]{
-            text-align: center;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-            margin-top: -60px;
-            width: 100%;
-        }
-    </style>
-    """, unsafe_allow_html=True
-)
-
-with st.sidebar:
-    st.image(logo)
+try:
+    logo_img = Image.open('picture.png')
+    st.markdown(
+        """
+        <style>
+            [data-testid=stSidebar] [data-testid=stImage]{
+                text-align: center;
+                display: block;
+                margin-left: auto;
+                margin-right: auto;
+                margin-top: -60px;
+                width: 100%;
+            }
+        </style>
+        """, unsafe_allow_html=True
+    )
+    with st.sidebar:
+        st.image(logo_img)
+except:
+    pass
 
 st.markdown("""
         <style>
@@ -149,25 +136,25 @@ st.markdown("""
         </style>
         """, unsafe_allow_html=True)
 
-st.write('')
-st.write('')
-
-# --- 1. SETTINGS & UI ---
-st.set_page_config(page_title="AI Wall Street Team", layout="wide")
-
 st.title("🤖 Multi-Agent AI Wall Street Team 🚀🌕")
 st.markdown("""
 This app use LangGraph to create a team of specialized AI agents running in parallel reporting to a supervisor agent.  
-
-The team analyzes short, medium, and long-term horizons to provide a weighted recommendation to buy/hold/sell.
 """)
 
 # Sidebar for Configuration
 with st.sidebar:
     st.header("Settings")
-    api_key = st.secrets["open_ai_api_key"]
+    api_key = st.secrets.get("open_ai_api_key", "")
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
-    analyze_clicked = st.button("Analyze") 
+    col1, col2 = st.columns(2)
+    with col1:
+        analyze_clicked = st.button("Analyze") 
+    with col2:
+        if st.button("Clear Results"):
+            for key in ['final_state', 'ticker', 'df_1d', 'df_1m', 'df_1y']:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.rerun()
     
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
@@ -183,6 +170,7 @@ def get_financial_data(ticker):
     return df_1d, df_1m, df_1y, info, dividends
 
 def add_indicators(df):
+    if df.empty: return df
     df['SMA20'] = df['Close'].rolling(window=20).mean()
     delta = df['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
@@ -206,40 +194,33 @@ class AgentState(TypedDict):
 llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 async def fundamental_node(state: AgentState):
-    prompt = f"Act as a Fundamental Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze long-term health. Provide insights for the next month and 6 months specifically. State a position with Confidence Score (0-100%)."
+    prompt = f"Act as a Fundamental Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze long-term health. Position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"fundamental_report": res.content}
 
 async def technical_node(state: AgentState):
-    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze price action for the next day and next week using RSI/SMA. State a position with Confidence Score (0-100%)."
+    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze RSI/SMA. Position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"technical_report": res.content}
 
 async def ml_node(state: AgentState):
-    prompt = f"Act as an ML Analyst for {state['ticker']}. Identify patterns for the next day, week, and month. State a position with Confidence Score (0-100%)."
+    prompt = f"Act as an ML Analyst for {state['ticker']}. Identify patterns. Position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"ml_report": res.content}
 
 async def forecasting_node(state: AgentState):
-    prompt = f"Act as a Time Series Forecaster for {state['ticker']}. Provide price targets for next day, week, month, and 6 months. State a position with Confidence Score (0-100%)."
+    prompt = f"Act as a Time Series Forecaster for {state['ticker']}. Position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"forecasting_report": res.content}
 
 async def news_node(state: AgentState):
-    prompt = f"Act as a Sentiment Analyst for {state['ticker']}. Evaluate macro impact on all horizons (Day to 6-Months). State a position with Confidence Score (0-100%)."
+    prompt = f"Act as a Sentiment Analyst for {state['ticker']}. Evaluate macro impact. Position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"news_report": res.content}
 
 async def supervisor_node(state: AgentState):
     context = f"Reports: {state['fundamental_report']} | {state['technical_report']} | {state['ml_report']} | {state['forecasting_report']} | {state['news_report']}"
-    prompt = (
-        f"As CIO, synthesize all reports for {state['ticker']}. You must provide a clear recommendation (Buy/Hold/Sell) "
-        f"for four specific horizons: 1. Next Day, 2. Next Week, 3. Next Month, 4. Next 6 Months. "
-        f"For EACH horizon, provide: \n"
-        f"- The Recommendation\n"
-        f"- A Confidence Score (0-100%)\n"
-        f"- A detailed explanation of how that score was arrived at based on the agent reports."
-    )
+    prompt = f"As CIO, synthesize all reports for {state['ticker']}. Clear recommendation (Buy/Hold/Sell) for 4 horizons: Day, Week, Month, 6 Months."
     res = await llm.ainvoke(prompt + context)
     return {"final_recommendation": res.content}
 
@@ -265,6 +246,20 @@ builder.add_edge("news", "supervisor")
 builder.add_edge("supervisor", END)
 graph = builder.compile()
 
+def create_technical_chart(df, title, is_candle=True):
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+    if is_candle:
+        fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Price"), row=1, col=1)
+    else:
+        fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', line=dict(color='cyan'), name="Price"), row=1, col=1)
+    
+    fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
+    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+    fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
+    return fig
+
 # --- 6. APP EXECUTION ---
 if not api_key:
     st.info("Please enter your OpenAI API Key in the sidebar.")
@@ -272,66 +267,21 @@ else:
     if analyze_clicked:
         with st.spinner("Synthesizing multi-horizon recommendations..."):
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
-            
-            df_1d = add_indicators(df_1d)
-            df_1m = add_indicators(df_1m)
-            df_1y = add_indicators(df_1y)
+            df_1d, df_1m, df_1y = add_indicators(df_1d), add_indicators(df_1m), add_indicators(df_1y)
 
-            def create_technical_chart(df, title, is_candle=True):
-                fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-                if is_candle:
-                    fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Price"), row=1, col=1)
-                else:
-                    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', line=dict(color='cyan'), name="Price"), row=1, col=1)
-                
-                fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
-                fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
-                fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-                fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-                fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
-                return fig
-
-            st.caption("1-Day Intraday with SMA & RSI (Short)")
-            st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
-            st.caption("1-Month Daily with SMA & RSI (Medium)")
-            st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
-            st.caption("1-Year Daily with SMA & RSI (Long)")
-            st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
-
-            div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
             summary = (f"TICKER: {selected_ticker}\n"
-                       f"INFO: P/E: {info.get('trailingPE')}, Mkt Cap: {info.get('marketCap')}, Div Yield: {info.get('dividendYield')}\n"
-                       f"DIVIDENDS (Recent): {div_summary}\n"
-                       f"CURRENT CLOSE: {df_1d['Close'].iloc[-1]:.2f}\n"
-                       f"1M RANGE: {df_1m['Low'].min():.2f} - {df_1m['High'].max():.2f}\n"
-                       f"1Y TREND: Start {df_1y['Close'].iloc[0]:.2f} to End {df_1y['Close'].iloc[-1]:.2f}")
+                       f"CURRENT CLOSE: {df_1d['Close'].iloc[-1]:.2f}")
 
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
 
-            # Store final state and charts in session for persistence
             st.session_state['final_state'] = final_state
             st.session_state['ticker'] = selected_ticker
             st.session_state['df_1d'] = df_1d
             st.session_state['df_1m'] = df_1m
             st.session_state['df_1y'] = df_1y
 
-    # Display results if they exist in session state
-    if 'final_state' in st.session_state:
-        def create_technical_chart(df, title, is_candle=True):
-            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-            if is_candle:
-                fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Price"), row=1, col=1)
-            else:
-                fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', line=dict(color='cyan'), name="Price"), row=1, col=1)
-            
-            fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
-            fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
-            fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-            fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-            fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
-            return fig
-
+    if 'final_state' in st.session_state and 'df_1d' in st.session_state:
         st.caption("1-Day Intraday with SMA & RSI (Short)")
         st.plotly_chart(create_technical_chart(st.session_state['df_1d'], "Short"), use_container_width=True)
         st.caption("1-Month Daily with SMA & RSI (Medium)")
@@ -348,7 +298,6 @@ else:
         for i, tab in enumerate(tabs):
             with tab: st.write(st.session_state['final_state'][reports[i]])
 
-    # Sidebar PDF Download Button
     if 'final_state' in st.session_state:
         pdf_data = create_pdf(st.session_state['ticker'], st.session_state['final_state'])
         st.sidebar.download_button(
