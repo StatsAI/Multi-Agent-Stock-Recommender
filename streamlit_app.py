@@ -60,7 +60,7 @@ def create_pdf(ticker, final_state):
         pdf.multi_cell(0, 5, content)
         pdf.ln(5)
         
-    return pdf.output(dest='S')
+    return bytes(pdf.output())
 
 logo = Image.open('picture.png')
 
