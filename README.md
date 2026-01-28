@@ -7,3 +7,5 @@
 ## 2. The team analyzes short, medium, and long-term horizons to provide a weighted recommendation to buy/hold/sell.
 
 <img width="938" height="461" alt="image" src="https://github.com/user-attachments/assets/03b41367-d8e1-4398-b5ad-67a64f8967e0" />
+
+<img width="923" height="415" alt="image" src="https://github.com/user-attachments/assets/f376f814-39e1-4c25-a152-bc8ab85aceca" />
