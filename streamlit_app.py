@@ -11,6 +11,8 @@ from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from PIL import Image
 from fpdf import FPDF
+from curl_cffi import requests
+  
 
 # --- PDF UTILITIES ---
 def clean_text_for_pdf(text):
