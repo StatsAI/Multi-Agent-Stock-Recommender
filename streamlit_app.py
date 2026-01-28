@@ -145,6 +145,7 @@ The team analyzes short, medium, and long-term horizons to provide a weighted re
 with st.sidebar:
     st.header("Settings")
     api_key = st.secrets["open_ai_api_key"]
+    data_source = st.radio("Select Data Source", ["Yahoo Finance", "Google Finance"])
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
     analyze_clicked = st.button("Analyze") 
     
@@ -152,8 +153,15 @@ with st.sidebar:
         os.environ["OPENAI_API_KEY"] = api_key
 
 # --- 2. DATA UTILITIES ---
-def get_financial_data(ticker):
-    stock = yf.Ticker(ticker)
+def get_financial_data(ticker, source):
+    # Adjust ticker format if Google Finance is selected (requires Exchange:Ticker)
+    if source == "Google Finance" and ":" not in ticker:
+        # Default to NASDAQ for common tech stocks if no exchange provided
+        fetch_ticker = f"NASDAQ:{ticker}"
+    else:
+        fetch_ticker = ticker
+
+    stock = yf.Ticker(fetch_ticker)
     df_1d = stock.history(period="1d", interval="1m")
     df_1m = stock.history(period="1mo", interval="1d")
     df_1y = stock.history(period="1y", interval="1d")
@@ -249,8 +257,8 @@ if not api_key:
     st.info("Please enter your OpenAI API Key in the sidebar.")
 else:
     if analyze_clicked:
-        with st.spinner("Synthesizing multi-horizon recommendations..."):
-            df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
+        with st.spinner(f"Synthesizing multi-horizon recommendations via {data_source}..."):
+            df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker, data_source)
             
             df_1d = add_indicators(df_1d)
             df_1m = add_indicators(df_1m)
@@ -270,15 +278,16 @@ else:
                 fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
                 return fig
 
-            st.caption("1-Day Intraday with SMA & RSI (Short)")
+            st.caption(f"1-Day Intraday with SMA & RSI (Short) - {data_source}")
             st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
-            st.caption("1-Month Daily with SMA & RSI (Medium)")
+            st.caption(f"1-Month Daily with SMA & RSI (Medium) - {data_source}")
             st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
-            st.caption("1-Year Daily with SMA & RSI (Long)")
+            st.caption(f"1-Year Daily with SMA & RSI (Long) - {data_source}")
             st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
 
             div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
             summary = (f"TICKER: {selected_ticker}\n"
+                       f"SOURCE: {data_source}\n"
                        f"INFO: P/E: {info.get('trailingPE')}, Mkt Cap: {info.get('marketCap')}, Div Yield: {info.get('dividendYield')}\n"
                        f"DIVIDENDS (Recent): {div_summary}\n"
                        f"CURRENT CLOSE: {df_1d['Close'].iloc[-1]:.2f}\n"
