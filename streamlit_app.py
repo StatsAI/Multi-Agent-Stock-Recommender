@@ -251,6 +251,27 @@ else:
             df_1m = add_indicators(df_1m)
             df_1y = add_indicators(df_1y)
 
+            def create_technical_chart(df, title, is_candle=True):
+                fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
+                if is_candle:
+                    fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Price"), row=1, col=1)
+                else:
+                    fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', line=dict(color='cyan'), name="Price"), row=1, col=1)
+                
+                fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
+                fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
+                fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+                fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
+                fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
+                return fig
+
+            st.caption("1-Day Intraday with SMA & RSI (Short)")
+            st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
+            st.caption("1-Month Daily with SMA & RSI (Medium)")
+            st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
+            st.caption("1-Year Daily with SMA & RSI (Long)")
+            st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
+
             div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
             summary = (f"TICKER: {selected_ticker}\n"
                        f"INFO: P/E: {info.get('trailingPE')}, Mkt Cap: {info.get('marketCap')}, Div Yield: {info.get('dividendYield')}\n"
@@ -265,53 +286,22 @@ else:
             # Store final state in session for PDF generation button
             st.session_state['final_state'] = final_state
             st.session_state['ticker'] = selected_ticker
-            st.session_state['df_1d'] = df_1d
-            st.session_state['df_1m'] = df_1m
-            st.session_state['df_1y'] = df_1y
 
-    # Check if data exists in session state before rendering
-    if 'final_state' in st.session_state and 'df_1d' in st.session_state:
-        final_state = st.session_state['final_state']
-        ticker = st.session_state['ticker']
-        df_1d = st.session_state['df_1d']
-        df_1m = st.session_state['df_1m']
-        df_1y = st.session_state['df_1y']
-
-        def create_technical_chart(df, title, is_candle=True):
-            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
-            if is_candle:
-                fig.add_trace(go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'], name="Price"), row=1, col=1)
-            else:
-                fig.add_trace(go.Scatter(x=df.index, y=df['Close'], mode='lines', line=dict(color='cyan'), name="Price"), row=1, col=1)
+            st.header("Executive Multi-Horizon Recommendation")
+            st.markdown(final_state['final_recommendation'])
             
-            fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
-            fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
-            fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
-            fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
-            fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
-            return fig
+            st.divider()
+            tabs = st.tabs(["Fundamental", "Technical", "ML", "Forecasting", "News"])
+            reports = ['fundamental_report', 'technical_report', 'ml_report', 'forecasting_report', 'news_report']
+            for i, tab in enumerate(tabs):
+                with tab: st.write(final_state[reports[i]])
 
-        st.caption("1-Day Intraday with SMA & RSI (Short)")
-        st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
-        st.caption("1-Month Daily with SMA & RSI (Medium)")
-        st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
-        st.caption("1-Year Daily with SMA & RSI (Long)")
-        st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
-
-        st.header("Executive Multi-Horizon Recommendation")
-        st.markdown(final_state['final_recommendation'])
-        
-        st.divider()
-        tabs = st.tabs(["Fundamental", "Technical", "ML", "Forecasting", "News"])
-        reports = ['fundamental_report', 'technical_report', 'ml_report', 'forecasting_report', 'news_report']
-        for i, tab in enumerate(tabs):
-            with tab: st.write(final_state[reports[i]])
-
-        # Sidebar PDF Download Button
-        pdf_data = create_pdf(ticker, final_state)
+    # Sidebar PDF Download Button
+    if 'final_state' in st.session_state:
+        pdf_data = create_pdf(st.session_state['ticker'], st.session_state['final_state'])
         st.sidebar.download_button(
             label="Download PDF Report",
             data=pdf_data,
-            file_name=f"{ticker}_Report.pdf",
+            file_name=f"{st.session_state['ticker']}_Report.pdf",
             mime="application/pdf"
         )
