@@ -16,6 +16,7 @@ from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
+import re
 
 # --- PDF UTILITIES ---
 def create_pdf(ticker, final_state):
@@ -53,8 +54,12 @@ def create_pdf(ticker, final_state):
     elements.append(title)
     elements.append(Spacer(1, 12))
     
+    def format_bold(text):
+        """Convert **text** to <b>text</b> for reportlab"""
+        return re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)
+    
     def format_content(content):
-        """Convert content with bullet points to proper formatting"""
+        """Convert content with bullet points and bold text to proper formatting"""
         lines = content.split('\n')
         formatted_elements = []
         
@@ -63,6 +68,9 @@ def create_pdf(ticker, final_state):
             if not line:
                 formatted_elements.append(Spacer(1, 6))
                 continue
+            
+            # Apply bold formatting
+            line = format_bold(line)
             
             # Handle headers (###)
             if line.startswith('###'):
