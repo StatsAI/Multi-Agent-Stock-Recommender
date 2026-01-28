@@ -120,23 +120,21 @@ else:
         with st.spinner("Analyzing Short, Medium, and Long-term horizons..."):
             df_5d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             
-            # Chart Row
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.caption("5-Day Candle (Short)")
-                fig1 = go.Figure(data=[go.Candlestick(x=df_5d.index, open=df_5d['Open'], high=df_5d['High'], low=df_5d['Low'], close=df_5d['Close'])])
-                fig1.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=300, margin=dict(l=0,r=0,b=0,t=0))
-                st.plotly_chart(fig1, use_container_width=True)
-            with c2:
-                st.caption("1-Month Candle (Medium)")
-                fig2 = go.Figure(data=[go.Candlestick(x=df_1m.index, open=df_1m['Open'], high=df_1m['High'], low=df_1m['Low'], close=df_1m['Close'])])
-                fig2.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=300, margin=dict(l=0,r=0,b=0,t=0))
-                st.plotly_chart(fig2, use_container_width=True)
-            with c3:
-                st.caption("1-Year Line (Long)")
-                fig3 = go.Figure(data=[go.Scatter(x=df_1y.index, y=df_1y['Close'], mode='lines', line=dict(color='cyan'))])
-                fig3.update_layout(template="plotly_dark", height=300, margin=dict(l=0,r=0,b=0,t=0))
-                st.plotly_chart(fig3, use_container_width=True)
+            # Charts Displayed Vertically
+            st.caption("5-Day Candle (Short)")
+            fig1 = go.Figure(data=[go.Candlestick(x=df_5d.index, open=df_5d['Open'], high=df_5d['High'], low=df_5d['Low'], close=df_5d['Close'])])
+            fig1.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=400, margin=dict(l=0,r=0,b=0,t=0))
+            st.plotly_chart(fig1, use_container_width=True)
+
+            st.caption("1-Month Candle (Medium)")
+            fig2 = go.Figure(data=[go.Candlestick(x=df_1m.index, open=df_1m['Open'], high=df_1m['High'], low=df_1m['Low'], close=df_1m['Close'])])
+            fig2.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=400, margin=dict(l=0,r=0,b=0,t=0))
+            st.plotly_chart(fig2, use_container_width=True)
+
+            st.caption("1-Year Line (Long)")
+            fig3 = go.Figure(data=[go.Scatter(x=df_1y.index, y=df_1y['Close'], mode='lines', line=dict(color='cyan'))])
+            fig3.update_layout(template="plotly_dark", height=400, margin=dict(l=0,r=0,b=0,t=0))
+            st.plotly_chart(fig3, use_container_width=True)
 
             # Data Preparation for Agents
             div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
