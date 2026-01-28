@@ -45,6 +45,21 @@ def get_financial_data(ticker):
     info = stock.info
     return lt_df, st_df, info
 
+def clean_text(text):
+    """Replaces Unicode characters that 'helvetica' cannot render."""
+    if not text:
+        return ""
+    replacements = {
+        "\u2013": "-", "\u2014": "-", "\u2011": "-",  # Dashes
+        "\u2018": "'", "\u2019": "'",                 # Single quotes
+        "\u201c": '"', "\u201d": '"',                 # Double quotes
+        "\u2022": "*",                                # Bullet points
+    }
+    for unicode_char, ascii_char in replacements.items():
+        text = text.replace(unicode_char, ascii_char)
+    # Encode to latin-1 and ignore anything else to prevent crashes
+    return text.encode("latin-1", "ignore").decode("latin-1")
+
 # --- 3. PDF GENERATION UTILITY ---
 class StockReportPDF(FPDF):
     def header(self):
@@ -55,20 +70,28 @@ class StockReportPDF(FPDF):
 def generate_report_pdf(ticker, recommendation, reports, risk):
     pdf = StockReportPDF()
     pdf.add_page()
+    
+    # Title Section
     pdf.set_font("helvetica", 'B', 16)
     pdf.cell(0, 10, f"Analysis: {ticker} | Strategy: {risk}", ln=True)
     pdf.ln(5)
+    
+    # Executive Summary
     pdf.set_fill_color(240, 240, 240)
     pdf.set_font("helvetica", 'B', 14)
     pdf.cell(0, 10, "Executive Summary", ln=True, fill=True)
     pdf.set_font("helvetica", size=11)
-    pdf.multi_cell(0, 8, recommendation)
+    # Use clean_text here to prevent FPDFUnicodeEncodingException
+    pdf.multi_cell(0, 8, clean_text(recommendation))
+    
+    # Analyst Deep Dives
     for name, content in reports.items():
         pdf.add_page()
         pdf.set_font("helvetica", 'B', 12)
         pdf.cell(0, 10, f"{name} Analyst Report", ln=True)
         pdf.set_font("helvetica", size=10)
-        pdf.multi_cell(0, 7, content)
+        pdf.multi_cell(0, 7, clean_text(content))
+        
     return pdf.output()
 
 # --- 4. LANGGRAPH AGENT STATE ---
@@ -86,7 +109,7 @@ class AgentState(TypedDict):
     final_recommendation: str
 
 # --- 5. PARALLEL AGENT NODES ---
-llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
 
 def fundamental_node(state: AgentState):
     res = llm.invoke(f"Fundamental Analysis for {state['ticker']} ({state['risk']} risk). Context: {state['lt_summary']}.")
@@ -148,11 +171,9 @@ if api_key:
             
             # Dashboard Head
             c1, c2, c3 = st.columns([1.5, 1.5, 1])
-            with c1: st.caption("Long-Term Trend"); st.line_chart(lt_df['Close'], height=200)
-            with c2: st.caption("Intra-day Momentum"); st.line_chart(st_df['Close'], height=200)
+            with c1: st.caption("Long-Term Trend (1Y)"); st.line_chart(lt_df['Close'], height=200)
+            with c2: st.caption("Intra-day Momentum (5D)"); st.line_chart(st_df['Close'], height=200)
             with c3: gauge_placeholder = st.empty()
-
-            
 
             # Run Analysis
             lt_sum = f"1Y High: {lt_df['High'].max():.2f}, Trend: {'Up' if lt_df['Close'].iloc[-1] > lt_df['Close'].iloc[0] else 'Down'}"
@@ -162,7 +183,7 @@ if api_key:
 
             # Gauge Rendering
             fig = go.Figure(go.Indicator(mode="gauge+number", value=final_state['news_sentiment'], 
-                                        domain={'x': [0, 1], 'y': [0, 1]}, title={'text': "Sentiment"},
+                                        domain={'x': [0, 1], 'y': [0, 1]}, title={'text': "Market Sentiment"},
                                         gauge={'axis': {'range': [-1, 1]}, 'bar': {'color': "white"},
                                                'steps': [{'range': [-1, -0.3], 'color': "red"}, {'range': [0.3, 1], 'color': "green"}]}))
             fig.update_layout(height=250, margin=dict(t=50, b=0), paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
@@ -173,15 +194,18 @@ if api_key:
             st.success(final_state['final_recommendation'])
             
             # Scenario Tool
-            shares = int(investment_amount / st_df['Close'].iloc[-1])
-            st.info(f"💡 At current prices, your ${investment_amount:,} budget allows for a position of **{shares} shares**.")
+            current_price = st_df['Close'].iloc[-1]
+            shares = int(investment_amount / current_price)
+            st.info(f"💡 Budget Strategy: With ${investment_amount:,}, you can open a position of **{shares} shares** at the current price of ${current_price:.2f}.")
 
             # PDF Download
             reports = {"Fundamental": final_state['fundamental_report'], "Technical": final_state['technical_report'], "ML": final_state['ml_report'], "Forecast": final_state['forecasting_report'], "News": final_state['news_report']}
             pdf_bytes = generate_report_pdf(selected_ticker, final_state['final_recommendation'], reports, risk_tolerance)
-            st.download_button("📥 Download Official Board PDF", data=bytes(pdf_bytes), file_name=f"{selected_ticker}_Board_Report.pdf")
+            st.download_button("📥 Download Official Board PDF", data=pdf_bytes, file_name=f"{selected_ticker}_Board_Report.pdf")
 
             st.divider()
             tabs = st.tabs(list(reports.keys()))
-            for i, report in enumerate(reports.values()):
+            for i, (name, report) in enumerate(reports.items()):
                 with tabs[i]: st.write(report)
+else:
+    st.info("Please enter your OpenAI API key in the sidebar to start.")
