@@ -3,120 +3,147 @@ import os
 import pandas as pd
 import yfinance as yf
 import plotly.graph_objects as go
-import re
-from fpdf import FPDF
 from typing import Annotated, List, TypedDict
 from langchain_openai import ChatOpenAI
-from langgraph.graph import StateGraph, START, END
+from langchain_core.messages import BaseMessage, HumanMessage
+from langgraph.graph import StateGraph, END
 
 # --- 1. SETTINGS & UI ---
-st.set_page_config(page_title="Investment Committee AI", layout="wide")
-st.title("🏦 Institutional Investment Committee")
+st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 
+st.title("ðŸ¤– Multi-Agent Quantitative Analysis Team")
+st.markdown("""
+This app deploys a team of specialized AI agents to analyze stocks using **gpt-5-mini**. 
+The team provides a unified recommendation for tomorrow's trading session.
+""")
+
+# Sidebar for Configuration
 with st.sidebar:
-    api_key = st.secrets.get("open_ai_api_key") or st.text_input("OpenAI API Key", type="password")
-    selected_ticker = st.text_input("Ticker", value="NVDA").upper()
-    risk_tolerance = st.selectbox("Mandate", ["Conservative", "Balanced", "Aggressive"], index=1)
-    investment_amount = st.number_input("Budget ($)", value=10000)
-    if api_key: os.environ["OPENAI_API_KEY"] = api_key
+    st.header("Settings")
+    #api_key = st.text_input("OpenAI API Key", type="password")
+    api_key = st.secrets["open_ai_api_key"]
+    selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
+    timeframe = st.selectbox("Chart Timeframe", ["1mo", "6mo", "1y"], index=0)
+    
+    if api_key:
+        os.environ["OPENAI_API_KEY"] = api_key
 
 # --- 2. DATA UTILITIES ---
 def get_financial_data(ticker):
+    """Fetches comprehensive data for the agents."""
     stock = yf.Ticker(ticker)
-    return stock.history(period="1y"), stock.history(period="5d", interval="5m")
+    # Get daily data for the chart and analysis
+    df = stock.history(period="1mo", interval="1d")
+    # Get 1-day intra-day data for precise entry/exit
+    intraday = stock.history(period="1d", interval="5m")
+    info = stock.info
+    return df, intraday, info
 
-def clean_text(text):
-    if not text: return ""
-    rep = {"\u2013": "-", "\u2014": "-", "\u2011": "-", "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"'}
-    for k, v in rep.items(): text = text.replace(k, v)
-    return text.encode("latin-1", "ignore").decode("latin-1")
-
-# --- 3. AGENT DEFINITIONS (High-Conviction) ---
+# --- 3. LANGGRAPH AGENT STATE ---
 class AgentState(TypedDict):
     ticker: str
-    risk: str
-    lt_summary: str
-    st_summary: str
+    data_summary: str
     fundamental_report: str
     technical_report: str
     ml_report: str
+    forecasting_report: str
     news_report: str
-    news_sentiment: float
     final_recommendation: str
 
+# --- 4. AGENT NODES ---
 llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
 
 def fundamental_node(state: AgentState):
-    prompt = f"You are a Senior Fundamental Analyst. TASK: Review {state['ticker']} for a {state['risk']} portfolio. Based on {state['lt_summary']}, issue a definitive BUY or SELL rating. No 'on the other hand' hedging. Give 1 price target."
-    return {"fundamental_report": llm.invoke(prompt).content}
+    prompt = f"Act as a Fundamental Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze P/E, Debt/Equity, and Cash Flow. Provide a Buy/Hold/Sell opinion with concrete metrics and a 1-day outlook."
+    res = llm.invoke(prompt)
+    return {"fundamental_report": res.content}
 
 def technical_node(state: AgentState):
-    prompt = f"You are a Quant Technician. TASK: Analyze {state['st_summary']}. Provide a Bullish/Bearish stance. Specify EXACT Entry and Stop Loss levels. No vague ranges."
-    return {"technical_report": llm.invoke(prompt).content}
+    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze RSI, MACD, and Moving Averages. Recommend an entry time for tomorrow and an exit strategy to minimize loss."
+    res = llm.invoke(prompt)
+    return {"technical_report": res.content}
+
+def ml_node(state: AgentState):
+    prompt = f"Act as an ML Analyst for {state['ticker']}. Using historical price patterns in {state['data_summary']}, predict the probability of a price increase tomorrow. State your confidence level and specific price targets."
+    res = llm.invoke(prompt)
+    return {"ml_report": res.content}
+
+def forecasting_node(state: AgentState):
+    prompt = f"Act as a Time Series Forecasting Analyst. Analyze the trend for {state['ticker']}. Predict the price range for the next 24-48 hours. Suggest a holding duration."
+    res = llm.invoke(prompt)
+    return {"forecasting_report": res.content}
 
 def news_node(state: AgentState):
-    prompt = f"Analyze sentiment for {state['ticker']}. State if news is ACCELERATING or DECELERATING price. End with: SENTIMENT_SCORE: X (from -1.0 to 1.0)."
-    res = llm.invoke(prompt).content
-    score = float(re.search(r"SENTIMENT_SCORE:\s*([\d\.-]+)", res).group(1)) if "SENTIMENT_SCORE" in res else 0.0
-    return {"news_report": res, "news_sentiment": score}
+    prompt = f"Act as a Sentiment & News Analyst for {state['ticker']}. Scan (simulated) for recent news and social media sentiment. How do macro events impact this stock tomorrow?"
+    res = llm.invoke(prompt)
+    return {"news_report": res.content}
 
 def supervisor_node(state: AgentState):
-    prompt = f"""
-    You are the Chief Investment Officer. Synthesize these reports:
-    F: {state['fundamental_report']}
-    T: {state['technical_report']}
-    N: {state['news_report']}
-    
-    TASK: ISSUE A BINDING TRADE ORDER. 
-    FORMAT: 
-    - ACTION: [BUY/SELL/HOLD]
-    - ALLOCATION: [Percentage of {state['risk']} budget]
-    - ENTRY/EXIT: [Specific Prices]
-    - RATIONALE: [One sentence of core logic]
+    context = f"""
+    Fundamental: {state['fundamental_report']}
+    Technical: {state['technical_report']}
+    ML: {state['ml_report']}
+    Forecast: {state['forecasting_report']}
+    News: {state['news_report']}
     """
-    return {"final_recommendation": llm.invoke(prompt).content}
+    prompt = f"You are the Chief Investment Officer. Based on the reports below for {state['ticker']}, provide a FINAL RECOMMENDATION. Include: 1. Action (BUY/SELL/WAIT), 2. Purchase Time, 3. Holding Duration, 4. Stop Loss Price."
+    res = llm.invoke(prompt + context)
+    return {"final_recommendation": res.content}
 
-# --- 4. GRAPH CONSTRUCTION (The Entrypoint Fix) ---
+# --- 5. GRAPH CONSTRUCTION ---
 builder = StateGraph(AgentState)
 builder.add_node("fundamental", fundamental_node)
 builder.add_node("technical", technical_node)
+builder.add_node("ml", ml_node)
+builder.add_node("forecasting", forecasting_node)
 builder.add_node("news", news_node)
 builder.add_node("supervisor", supervisor_node)
 
-# Connect START to initial parallel nodes
-builder.add_edge(START, "fundamental")
-builder.add_edge(START, "technical")
-builder.add_edge(START, "news")
-
-# Connect parallel nodes to supervisor
-builder.add_edge("fundamental", "supervisor")
-builder.add_edge("technical", "supervisor")
+builder.set_entry_point("fundamental")
+builder.add_edge("fundamental", "technical")
+builder.add_edge("technical", "ml")
+builder.add_edge("ml", "forecasting")
+builder.add_edge("forecasting", "news")
 builder.add_edge("news", "supervisor")
 builder.add_edge("supervisor", END)
-
 graph = builder.compile()
 
-# --- 5. PDF GENERATION ---
-def generate_report_pdf(ticker, recommendation, reports):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("helvetica", 'B', 16)
-    pdf.cell(0, 10, clean_text(f"INVESTMENT COMMITTEE ORDER: {ticker}"), ln=True)
-    pdf.set_font("helvetica", size=11)
-    pdf.multi_cell(0, 8, clean_text(recommendation))
-    return bytes(pdf.output())
+# --- 6. APP EXECUTION ---
+if not api_key:
+    st.info("Please enter your OpenAI API Key in the sidebar to start analysis.")
+else:
+    if st.button(f"Analyze {selected_ticker}"):
+        with st.spinner("Fetching market data and convening the agent team..."):
+            # Fetch Data
+            df, intraday, info = get_financial_data(selected_ticker)
+            
+            # Show Visuals
+            st.subheader(f"Market Overview: {selected_ticker}")
+            fig = go.Figure(data=[go.Candlestick(
+                x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close']
+            )])
+            fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=400)
+            st.plotly_chart(fig, use_container_width=True)
 
-# --- 6. EXECUTION ---
-if api_key and st.button("EXECUTE TRADE DELIBERATION"):
-    with st.spinner("Committee in session..."):
-        lt_df, st_df = get_financial_data(selected_ticker)
-        lt_s = f"Price: {lt_df['Close'].iloc[-1]:.2f}, 1Y Chg: {((lt_df['Close'].iloc[-1]/lt_df['Close'].iloc[0])-1)*100:.1f}%"
-        st_s = f"5D Vol: {st_df['Close'].std():.2f}"
-        
-        result = graph.invoke({"ticker": selected_ticker, "lt_summary": lt_s, "st_summary": st_s, "risk": risk_tolerance})
-        
-        st.header("🏁 Final Committee Decision")
-        st.code(result['final_recommendation'], language="markdown")
-        
-        pdf_data = generate_report_pdf(selected_ticker, result['final_recommendation'], {})
-        st.download_button("📥 Download Official Trade Ticket", data=pdf_data, file_name="Trade_Order.pdf")
+            
+
+            # Prepare state context
+            summary = f"Recent Close: {df['Close'].iloc[-1]:.2f}, High: {df['High'].max():.2f}, Low: {df['Low'].min():.2f}. Market Cap: {info.get('marketCap')}"
+            
+            # Run Agents
+            initial_state = {"ticker": selected_ticker, "data_summary": summary}
+            final_state = graph.invoke(initial_state)
+
+            # Display Results
+            st.header("Executive Summary")
+            st.success(final_state['final_recommendation'])
+
+            st.divider()
+            
+            # Display Analyst Details in Tabs
+            t1, t2, t3, t4, t5 = st.tabs(["Fundamental", "Technical", "ML", "Forecasting", "News"])
+            with t1: st.write(final_state['fundamental_report'])
+            with t2: st.write(final_state['technical_report'])
+            with t3: st.write(final_state['ml_report'])
+            with t4: st.write(final_state['forecasting_report'])
+            with t5: st.write(final_state['news_report'])
