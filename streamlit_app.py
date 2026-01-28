@@ -339,3 +339,45 @@ else:
             mime="application/pdf",
             use_container_width=True # Matched width for the download button too
         )
+
+        # --- EXPLAINER BUTTON ---
+        if st.sidebar.button("Explain how the app works!", use_container_width=True):
+            st.divider()
+            st.header("System Architecture & Workflow")
+            
+            col_a, col_b = st.columns([1, 1])
+            
+            with col_a:
+                st.subheader("How it works")
+                st.markdown("""
+                This application utilizes an **Agentic Workflow** powered by **LangGraph**. Unlike a standard chatbot, it breaks down financial analysis into specialized tasks:
+                
+                1.  **Data Ingestion**: The system pulls real-time market data from Yahoo Finance.
+                2.  **Parallel Processing**: Five specialized AI Agents (Fundamental, Technical, ML, Forecasting, and News) analyze the data simultaneously.
+                3.  **State Management**: Each agent contributes its unique insights to a shared 'State' object.
+                4.  **The Supervisor**: A 'CIO Agent' reviews all individual reports to resolve conflicts and provide a final, unified investment strategy.
+                """)
+
+            with col_b:
+                st.subheader("Architecture Diagram")
+                # Mermaid diagram to visualize the LangGraph flow
+                st.mermaid("""
+                graph TD
+                    Start((Start)) --> Fundamental[Fundamental Agent]
+                    Start --> Technical[Technical Agent]
+                    Start --> ML[ML Agent]
+                    Start --> Forecast[Forecasting Agent]
+                    Start --> News[News Agent]
+                    
+                    Fundamental --> Supervisor{Supervisor Agent / CIO}
+                    Technical --> Supervisor
+                    ML --> Supervisor
+                    Forecast --> Supervisor
+                    News --> Supervisor
+                    
+                    Supervisor --> End((Final Recommendation))
+                    
+                    style Start fill:#f9f,stroke:#333,stroke-width:2px
+                    style End fill:#00ff00,stroke:#333,stroke-width:2px
+                    style Supervisor fill:#4169E1,color:#fff
+                """)
