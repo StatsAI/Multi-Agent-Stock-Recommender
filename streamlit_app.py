@@ -20,7 +20,8 @@ The team provides a unified recommendation for tomorrow's trading session.
 # Sidebar for Configuration
 with st.sidebar:
     st.header("Settings")
-    api_key = st.text_input("OpenAI API Key", type="password")
+    #api_key = st.text_input("OpenAI API Key", type="password")
+    api_key = st.secrets["open_ai_api_key"]
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
     timeframe = st.selectbox("Chart Timeframe", ["1mo", "6mo", "1y"], index=0)
     
