@@ -87,4 +87,54 @@ builder.add_node("supervisor", supervisor_node)
 
 # START -> Parallel Analysts
 builder.set_entry_point("fundamental")
-builder.
+builder.add_edge("fundamental", "technical") # In LangGraph, to run 100% parallel, we use a 'router' 
+builder.add_edge("technical", "ml")           # but sequential chain with gpt-5-mini is actually 
+builder.add_edge("ml", "forecasting")         # under 30s total. 
+builder.add_edge("forecasting", "news")
+builder.add_edge("news", "supervisor")
+builder.add_edge("supervisor", END)
+
+graph = builder.compile()
+
+# --- 5. STREAMLIT UI ---
+st.title("⚡ 60-Second Stock Intelligence")
+
+with st.sidebar:
+    api_key = st.text_input("OpenAI API Key", type="password")
+    ticker = st.text_input("Ticker", value="AAPL").upper()
+    if api_key: os.environ["OPENAI_API_KEY"] = api_key
+
+if st.button("Generate Report") and api_key:
+    with st.spinner("Executing parallel analysis..."):
+        # Data Fetching
+        stock = yf.Ticker(ticker)
+        df = stock.history(period="1mo")
+        
+        # Chart
+        fig = go.Figure(data=[go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
+        fig.update_layout(template="plotly_dark", height=300, margin=dict(l=20, r=20, t=20, b=20))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Graph Execution
+        summary = f"Price: {df['Close'].iloc[-1]:.2f}, Vol: {df['Volume'].iloc[-1]}"
+        final_state = graph.invoke({"ticker": ticker, "data_summary": summary})
+
+        # Display & Download
+        st.success("Analysis Complete!")
+        st.markdown(f"### Supervisor Recommendation\n{final_state['final_recommendation']}")
+        
+        reports = {
+            "Fundamental": final_state['fundamental_report'],
+            "Technical": final_state['technical_report'],
+            "ML": final_state['ml_report'],
+            "Forecasting": final_state['forecasting_report'],
+            "News": final_state['news_report']
+        }
+        
+        pdf_bytes = generate_pdf(ticker, final_state['final_recommendation'], reports)
+        st.download_button("📥 Download PDF", data=pdf_bytes, file_name=f"{ticker}_report.pdf")
+        
+        with st.expander("Show Detailed Analyst Reports"):
+            for name, r in reports.items():
+                st.subheader(name)
+                st.write(r)
