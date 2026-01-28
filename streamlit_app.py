@@ -48,7 +48,7 @@ st.write('')
 # --- 1. SETTINGS & UI ---
 st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 
-st.title("🤖 Multi-Agent AI Wall Street Team 🚀🚀🚀")
+st.title("🤖 Multi-Agent AI Wall Street Team 🚀🌕")
 st.markdown("""
 This app use LangGraph to create a team of specialized AI agents running in parallel reporting to a supervisor agent.  
 
