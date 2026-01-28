@@ -17,6 +17,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, 
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from io import BytesIO
 import re
+import streamlit.components.v1 as components
 
 # --- PDF UTILITIES ---
 def create_pdf(ticker, final_state):
@@ -110,12 +111,11 @@ st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 # --- CUSTOM CSS FOR BUTTON UNIFORMITY ---
 st.markdown("""
     <style>
-    /* Ensure sidebar buttons have consistent height and alignment */
     div[data-testid="stVerticalBlock"] > div:has(button) {
         align-items: stretch;
     }
     .stButton > button {
-        height: 3em; /* Sets a fixed height for both buttons */
+        height: 3em; 
         display: flex;
         align-items: center;
         justify-content: center;
@@ -163,13 +163,10 @@ with st.sidebar:
     api_key = st.secrets.get("open_ai_api_key", "")
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
     
-    # Updated Column Layout for Buttons
     col1, col2 = st.columns(2)
     with col1:
-        # use_container_width=True makes the button fill the half-column width
         analyze_clicked = st.button("Analyze", use_container_width=True) 
     with col2:
-        # use_container_width=True ensures symmetry
         if st.button("Clear Results", use_container_width=True):
             for key in ['final_state', 'ticker', 'df_1d', 'df_1m', 'df_1y']:
                 if key in st.session_state:
@@ -289,7 +286,6 @@ else:
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             df_1d, df_1m, df_1y = add_indicators(df_1d), add_indicators(df_1m), add_indicators(df_1y)
             
-            # Show charts immediately while agents run
             st.caption("1-Day Intraday with SMA & RSI (Short)")
             st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
             st.caption("1-Month Daily with SMA & RSI (Medium)")
@@ -304,7 +300,6 @@ else:
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
 
-            # Persist to session state
             st.session_state['final_state'] = final_state
             st.session_state['ticker'] = selected_ticker
             st.session_state['df_1d'] = df_1d
@@ -312,7 +307,6 @@ else:
             st.session_state['df_1y'] = df_1y
             st.rerun()
 
-    # Display results if they exist in session state (persistence)
     if 'final_state' in st.session_state and 'df_1d' in st.session_state:
         st.caption("1-Day Intraday with SMA & RSI (Short)")
         st.plotly_chart(create_technical_chart(st.session_state['df_1d'], "Short"), use_container_width=True)
@@ -337,47 +331,62 @@ else:
             data=pdf_data,
             file_name=f"{st.session_state['ticker']}_Report.pdf",
             mime="application/pdf",
-            use_container_width=True # Matched width for the download button too
+            use_container_width=True
         )
-
-        # --- EXPLAINER BUTTON ---
+        
+        # --- NEW EXPLAINER BUTTON ---
         if st.sidebar.button("Explain how the app works!", use_container_width=True):
             st.divider()
-            st.header("System Architecture & Workflow")
+            st.header("System Architecture: Agentic Financial Team")
             
-            col_a, col_b = st.columns([1, 1])
+            col_expl, col_diag = st.columns([1, 1.2])
             
-            with col_a:
-                st.subheader("How it works")
+            with col_expl:
+                st.subheader("Process Overview")
                 st.markdown("""
-                This application utilizes an **Agentic Workflow** powered by **LangGraph**. Unlike a standard chatbot, it breaks down financial analysis into specialized tasks:
+                This system uses an **Agentic AI Mesh** powered by LangGraph to mimic a professional investment committee.
                 
-                1.  **Data Ingestion**: The system pulls real-time market data from Yahoo Finance.
-                2.  **Parallel Processing**: Five specialized AI Agents (Fundamental, Technical, ML, Forecasting, and News) analyze the data simultaneously.
-                3.  **State Management**: Each agent contributes its unique insights to a shared 'State' object.
-                4.  **The Supervisor**: A 'CIO Agent' reviews all individual reports to resolve conflicts and provide a final, unified investment strategy.
+                * **Specialized Analysis**: Instead of one general prompt, we deploy five distinct agents. Each uses a specialized persona and mathematical context.
+                * **Parallel Workflow**: The agents run concurrently, significantly reducing latency while ensuring independent bias-free reporting.
+                * **Stateful Memory**: A central `AgentState` object tracks every insight, which is then passed to the Supervisor.
+                * **Executive Synthesis**: The Supervisor (CIO) performs 'Agent Fusion', resolving contradictions between technical and fundamental signals to generate a final decision.
                 """)
-
-            with col_b:
-                st.subheader("Architecture Diagram")
-                # Mermaid diagram to visualize the LangGraph flow
-                st.mermaid("""
+            
+            with col_diag:
+                st.subheader("Logical Architecture")
+                mermaid_code = """
                 graph TD
-                    Start((Start)) --> Fundamental[Fundamental Agent]
-                    Start --> Technical[Technical Agent]
-                    Start --> ML[ML Agent]
-                    Start --> Forecast[Forecasting Agent]
-                    Start --> News[News Agent]
+                    User([User Input: Ticker]) --> Data[YFinance Data Ingestion]
+                    Data --> State{AgentState}
                     
-                    Fundamental --> Supervisor{Supervisor Agent / CIO}
-                    Technical --> Supervisor
+                    subgraph Parallel_Agents [Analyst Team]
+                        State --> Fund[Fundamental Agent]
+                        State --> Tech[Technical Agent]
+                        State --> ML[ML Pattern Agent]
+                        State --> Forecast[Forecasting Agent]
+                        State --> News[Sentiment Agent]
+                    end
+                    
+                    Fund --> Supervisor
+                    Tech --> Supervisor
                     ML --> Supervisor
                     Forecast --> Supervisor
                     News --> Supervisor
                     
-                    Supervisor --> End((Final Recommendation))
+                    Supervisor{{Supervisor: CIO Synthesis}} --> Final[/Final Multi-Horizon Strategy/]
                     
-                    style Start fill:#f9f,stroke:#333,stroke-width:2px
-                    style End fill:#00ff00,stroke:#333,stroke-width:2px
-                    style Supervisor fill:#4169E1,color:#fff
-                """)
+                    style Parallel_Agents fill:#f5f5f5,stroke:#666,stroke-dasharray: 5 5
+                    style Supervisor fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+                    style Final fill:#c8e6c9,stroke:#2e7d32
+                """
+                
+                html_code = f"""
+                <div class="mermaid" style="background-color: white; padding: 10px; border-radius: 10px;">
+                    {mermaid_code}
+                </div>
+                <script type="module">
+                    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});
+                </script>
+                """
+                components.html(html_code, height=600)
