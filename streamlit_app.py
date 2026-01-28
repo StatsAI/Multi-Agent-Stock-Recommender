@@ -24,7 +24,7 @@ with st.sidebar:
     st.header("Settings")
     api_key = st.secrets["open_ai_api_key"]
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
-    analyze_clicked = st.button("Analyze") # Moved and renamed button
+    analyze_clicked = st.button("Analyze") 
     
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
@@ -69,36 +69,43 @@ class AgentState(TypedDict):
     final_recommendation: str
 
 # --- 4. ASYNC AGENT NODES ---
-llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
+llm = ChatOpenAI(model="gpt-4o", temperature=0) # Using stable 4o for complex reasoning
 
 async def fundamental_node(state: AgentState):
-    prompt = f"Act as a Fundamental Analyst for {state['ticker']}. Data context: {state['data_summary']}. Use the provided dividend history and info to analyze yield, P/E, and Debt/Equity over the past year. State a definitive Buy/Hold/Sell position considering the company's long-term health. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as a Fundamental Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze long-term health. Provide insights for the next month and 6 months specifically. State a position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"fundamental_report": res.content}
 
 async def technical_node(state: AgentState):
-    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze the short-term (5m) and medium-term (daily) price action. Calculate virtual RSI/MACD based on the high/low/close data provided. Provide a concrete entry time and exit price. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze price action for the next day and next week using RSI/SMA. State a position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"technical_report": res.content}
 
 async def ml_node(state: AgentState):
-    prompt = f"Act as an ML Analyst for {state['ticker']}. Evaluate price patterns across 5-day, 1-month, and 1-year horizons in the provided data summary. State the probability of a price increase tomorrow vs next week. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as an ML Analyst for {state['ticker']}. Identify patterns for the next day, week, and month. State a position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"ml_report": res.content}
 
 async def forecasting_node(state: AgentState):
-    prompt = f"Act as a Time Series Forecasting Analyst. Look at the 1-year trend vs the 5-day volatility for {state['ticker']}. Provide a specific price range for the next 48 hours and a forecast for the next 30 days. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as a Time Series Forecaster for {state['ticker']}. Provide price targets for next day, week, month, and 6 months. State a position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"forecasting_report": res.content}
 
 async def news_node(state: AgentState):
-    prompt = f"Act as a Sentiment Analyst for {state['ticker']}. Evaluate how recent macro events impact both the immediate 24-hour window and the 1-year outlook. State a definitive directional bias. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as a Sentiment Analyst for {state['ticker']}. Evaluate macro impact on all horizons (Day to 6-Months). State a position with Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"news_report": res.content}
 
 async def supervisor_node(state: AgentState):
     context = f"Reports: {state['fundamental_report']} | {state['technical_report']} | {state['ml_report']} | {state['forecasting_report']} | {state['news_report']}"
-    prompt = f"As CIO, weigh these reports based on confidence and time horizons. Issue a FINAL EXECUTIVE COMMAND for {state['ticker']}: 1. Action, 2. Timing, 3. Duration, 4. Stop Loss."
+    prompt = (
+        f"As CIO, synthesize all reports for {state['ticker']}. You must provide a clear recommendation (Buy/Hold/Sell) "
+        f"for four specific horizons: 1. Next Day, 2. Next Week, 3. Next Month, 4. Next 6 Months. "
+        f"For EACH horizon, provide: \n"
+        f"- The Recommendation\n"
+        f"- A Confidence Score (0-100%)\n"
+        f"- A detailed explanation of how that score was arrived at based on the agent reports."
+    )
     res = await llm.ainvoke(prompt + context)
     return {"final_recommendation": res.content}
 
@@ -129,10 +136,10 @@ if not api_key:
     st.info("Please enter your OpenAI API Key in the sidebar.")
 else:
     if analyze_clicked:
-        with st.spinner("Analyzing Short, Medium, and Long-term horizons..."):
+        with st.spinner("Synthesizing multi-horizon recommendations..."):
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             
-            # Apply indicators to all dataframes
+            # Apply indicators
             df_1d = add_indicators(df_1d)
             df_1m = add_indicators(df_1m)
             df_1y = add_indicators(df_1y)
@@ -152,17 +159,15 @@ else:
                 fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
                 return fig
 
-            # --- Display Charts Vertically ---
+            # Display Charts
             st.caption("1-Day Intraday with SMA & RSI (Short)")
             st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
-
             st.caption("1-Month Daily with SMA & RSI (Medium)")
             st.plotly_chart(create_technical_chart(df_1m, "Medium"), use_container_width=True)
-
             st.caption("1-Year Daily with SMA & RSI (Long)")
             st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
 
-            # Data Preparation for Agents
+            # Data Prep
             div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
             summary = (f"TICKER: {selected_ticker}\n"
                        f"INFO: P/E: {info.get('trailingPE')}, Mkt Cap: {info.get('marketCap')}, Div Yield: {info.get('dividendYield')}\n"
@@ -174,8 +179,8 @@ else:
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
 
-            st.header("Executive Summary")
-            st.success(final_state['final_recommendation'])
+            st.header("Executive Multi-Horizon Recommendation")
+            st.markdown(final_state['final_recommendation'])
             
             st.divider()
             tabs = st.tabs(["Fundamental", "Technical", "ML", "Forecasting", "News"])
