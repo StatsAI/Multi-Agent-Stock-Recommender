@@ -110,11 +110,12 @@ st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 # --- CUSTOM CSS FOR BUTTON UNIFORMITY ---
 st.markdown("""
     <style>
+    /* Ensure sidebar buttons have consistent height and alignment */
     div[data-testid="stVerticalBlock"] > div:has(button) {
         align-items: stretch;
     }
     .stButton > button {
-        height: 3em; 
+        height: 3em; /* Sets a fixed height for both buttons */
         display: flex;
         align-items: center;
         justify-content: center;
@@ -162,10 +163,13 @@ with st.sidebar:
     api_key = st.secrets.get("open_ai_api_key", "")
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
     
+    # Updated Column Layout for Buttons
     col1, col2 = st.columns(2)
     with col1:
+        # use_container_width=True makes the button fill the half-column width
         analyze_clicked = st.button("Analyze", use_container_width=True) 
     with col2:
+        # use_container_width=True ensures symmetry
         if st.button("Clear Results", use_container_width=True):
             for key in ['final_state', 'ticker', 'df_1d', 'df_1m', 'df_1y']:
                 if key in st.session_state:
@@ -271,6 +275,8 @@ def create_technical_chart(df, title, is_candle=True):
     
     fig.add_trace(go.Scatter(x=df.index, y=df['SMA20'], line=dict(color='orange', width=1), name="SMA 20"), row=1, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df['RSI'], line=dict(color='purple', width=1.5), name="RSI"), row=2, col=1)
+    fig.add_hline(y=70, line_dash="dash", line_color="red", row=2, col=1)
+    fig.add_hline(y=30, line_dash="dash", line_color="green", row=2, col=1)
     fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
     return fig
 
@@ -283,6 +289,7 @@ else:
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             df_1d, df_1m, df_1y = add_indicators(df_1d), add_indicators(df_1m), add_indicators(df_1y)
             
+            # Show charts immediately while agents run
             st.caption("1-Day Intraday with SMA & RSI (Short)")
             st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
             st.caption("1-Month Daily with SMA & RSI (Medium)")
@@ -297,6 +304,7 @@ else:
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
 
+            # Persist to session state
             st.session_state['final_state'] = final_state
             st.session_state['ticker'] = selected_ticker
             st.session_state['df_1d'] = df_1d
@@ -304,6 +312,7 @@ else:
             st.session_state['df_1y'] = df_1y
             st.rerun()
 
+    # Display results if they exist in session state (persistence)
     if 'final_state' in st.session_state and 'df_1d' in st.session_state:
         st.caption("1-Day Intraday with SMA & RSI (Short)")
         st.plotly_chart(create_technical_chart(st.session_state['df_1d'], "Short"), use_container_width=True)
@@ -328,49 +337,5 @@ else:
             data=pdf_data,
             file_name=f"{st.session_state['ticker']}_Report.pdf",
             mime="application/pdf",
-            use_container_width=True
+            use_container_width=True # Matched width for the download button too
         )
-        
-        if st.sidebar.button("Explain how the app works", use_container_width=True):
-            st.divider()
-            st.subheader("The Agentic Team Brainstorm")
-            
-            st.write("""
-            Instead of a rigid flowchart, imagine a **Command Center**. When you click 'Analyze', 
-            the system launches five specialized 'analysts' into a virtual room.
-            """)
-
-            # Hand-drawn style visualization
-            st.markdown("""
-            ```text
-            [ HAND-DRAWN VISUALIZATION CONCEPT ]
-            
-                 ( MARKET DATA FEED )
-                          |
-            /-----------------------------\ 
-            |  [AGENT]      [AGENT]       |
-            | Fundamental   Technical     |  <-- Parallel Execution
-            |                             |
-            |  [AGENT]      [AGENT]       |
-            |    ML         Forecast      |
-            |            +                |
-            |        [AGENT] News         |
-            \-------------+---------------/
-                          |
-                          v
-                { SUPERVISOR NODE / CIO }
-                 "Synthesizes the chaos"
-                          |
-                          v
-               ( FINAL PDF & DASHBOARD )
-            ```
-            """)
-
-            st.markdown("""
-            ### End-to-End Workflow:
-            1. **Raw Data Extraction**: Real-time candle data and financial metrics are pulled for your ticker.
-            2. **Asynchronous Analysis**: Five separate AI prompts are fired simultaneously. Using `asyncio`, we don't wait for the Fundamental agent to finish before starting the Technical agent—they all work at once to save time.
-            3. **The Shared 'Blackboard'**: Every agent contributes their findings to a shared state.
-            4. **The CIO Review**: The Supervisor agent reads all five reports. Its job is to spot contradictions (e.g., Technical says 'Sell' but ML says 'Buy') and provide a final, reasoned verdict.
-            5. **The Report Generation**: Results are converted into interactive Plotly charts and a formatted PDF for professional use.
-            """)
