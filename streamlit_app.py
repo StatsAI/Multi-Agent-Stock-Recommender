@@ -10,10 +10,34 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import BaseMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from PIL import Image
+from fpdf import FPDF # Added fpdf2
+
+# --- PDF GENERATION FUNCTION ---
+def create_pdf(ticker, recommendation, reports_dict):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, f"AI Wall Street Analysis: {ticker}", ln=True, align='C')
+    pdf.ln(10)
+    
+    # Executive Summary
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, "Executive Multi-Horizon Recommendation", ln=True)
+    pdf.set_font("Arial", "", 10)
+    pdf.multi_cell(0, 5, recommendation)
+    pdf.ln(10)
+    
+    # Individual Reports
+    for name, content in reports_dict.items():
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(0, 10, f"{name.replace('_', ' ').title()}", ln=True)
+        pdf.set_font("Arial", "", 10)
+        pdf.multi_cell(0, 5, content)
+        pdf.ln(5)
+        
+    return pdf.output(dest='S')
 
 logo = Image.open('picture.png')
-#newsize = (95, 95)
-#logo = logo.resize(newsize)
 
 st.markdown(
     """
@@ -23,21 +47,20 @@ st.markdown(
             display: block;
             margin-left: auto;
             margin-right: auto;
-	    margin-top: -60px;
+            margin-top: -60px;
             width: 100%;
-	    #margin: 0;	         		
         }
     </style>
     """, unsafe_allow_html=True
 )
 
 with st.sidebar:
-	st.image(logo)
+    st.image(logo)
 
 st.markdown("""
         <style>
-               .block-container {
-		    padding-top: 0;
+                .block-container {
+                padding-top: 0;
                 }
         </style>
         """, unsafe_allow_html=True)
@@ -62,29 +85,34 @@ with st.sidebar:
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
     analyze_clicked = st.button("Analyze") 
     
+    # --- Download Button Logic ---
+    if "final_state" in st.session_state:
+        pdf_data = create_pdf(
+            st.session_state.ticker, 
+            st.session_state.final_state['final_recommendation'],
+            {k: v for k, v in st.session_state.final_state.items() if k.endswith('_report')}
+        )
+        st.download_button(
+            label="Download PDF Report",
+            data=pdf_data,
+            file_name=f"{st.session_state.ticker}_Report.pdf",
+            mime="application/pdf"
+        )
+    
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key
 
 # --- 2. DATA UTILITIES ---
 def get_financial_data(ticker):
-    """Fetches comprehensive multi-horizon data for the agents."""
     stock = yf.Ticker(ticker)
-    
-    # 1-Day Intraday Data (Short-term)
     df_1d = stock.history(period="1d", interval="1m")
-    # 1-Month Daily Data (Medium-term)
     df_1m = stock.history(period="1mo", interval="1d")
-    # 1-Year Daily Data (Long-term)
     df_1y = stock.history(period="1y", interval="1d")
-    
-    # Fundamental specific data
     info = stock.info
     dividends = stock.dividends
-    
     return df_1d, df_1m, df_1y, info, dividends
 
 def add_indicators(df):
-    """Calculates SMA20 and RSI14."""
     df['SMA20'] = df['Close'].rolling(window=20).mean()
     delta = df['Close'].diff()
     gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
@@ -105,7 +133,7 @@ class AgentState(TypedDict):
     final_recommendation: str
 
 # --- 4. ASYNC AGENT NODES ---
-llm = ChatOpenAI(model="gpt-4o", temperature=0) # Using stable 4o for complex reasoning
+llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 async def fundamental_node(state: AgentState):
     prompt = f"Act as a Fundamental Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze long-term health. Provide insights for the next month and 6 months specifically. State a position with Confidence Score (0-100%)."
@@ -175,12 +203,10 @@ else:
         with st.spinner("Synthesizing multi-horizon recommendations..."):
             df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             
-            # Apply indicators
             df_1d = add_indicators(df_1d)
             df_1m = add_indicators(df_1m)
             df_1y = add_indicators(df_1y)
 
-            # --- Chart Rendering Helper ---
             def create_technical_chart(df, title, is_candle=True):
                 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05, row_heights=[0.7, 0.3])
                 if is_candle:
@@ -195,7 +221,6 @@ else:
                 fig.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=500, margin=dict(l=0,r=0,b=0,t=0), showlegend=False)
                 return fig
 
-            # Display Charts
             st.caption("1-Day Intraday with SMA & RSI (Short)")
             st.plotly_chart(create_technical_chart(df_1d, "Short"), use_container_width=True)
             st.caption("1-Month Daily with SMA & RSI (Medium)")
@@ -203,7 +228,6 @@ else:
             st.caption("1-Year Daily with SMA & RSI (Long)")
             st.plotly_chart(create_technical_chart(df_1y, "Long", is_candle=False), use_container_width=True)
 
-            # Data Prep
             div_summary = dividends.tail(5).to_string() if not dividends.empty else "No dividends"
             summary = (f"TICKER: {selected_ticker}\n"
                        f"INFO: P/E: {info.get('trailingPE')}, Mkt Cap: {info.get('marketCap')}, Div Yield: {info.get('dividendYield')}\n"
@@ -214,12 +238,20 @@ else:
 
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
-
-            st.header("Executive Multi-Horizon Recommendation")
-            st.markdown(final_state['final_recommendation'])
             
-            st.divider()
-            tabs = st.tabs(["Fundamental", "Technical", "ML", "Forecasting", "News"])
-            reports = ['fundamental_report', 'technical_report', 'ml_report', 'forecasting_report', 'news_report']
-            for i, tab in enumerate(tabs):
-                with tab: st.write(final_state[reports[i]])
+            # Save to session state for PDF generator access
+            st.session_state.final_state = final_state
+            st.session_state.ticker = selected_ticker
+            st.rerun()
+
+    # --- Render Results from Session State ---
+    if "final_state" in st.session_state:
+        final_state = st.session_state.final_state
+        st.header("Executive Multi-Horizon Recommendation")
+        st.markdown(final_state['final_recommendation'])
+        
+        st.divider()
+        tabs = st.tabs(["Fundamental", "Technical", "ML", "Forecasting", "News"])
+        reports = ['fundamental_report', 'technical_report', 'ml_report', 'forecasting_report', 'news_report']
+        for i, tab in enumerate(tabs):
+            with tab: st.write(final_state[reports[i]])
