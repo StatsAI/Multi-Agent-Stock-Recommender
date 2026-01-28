@@ -56,9 +56,11 @@ def create_pdf(ticker, final_state):
                 pdf.set_font("Helvetica", "", 10)
             # Handle bullet points (* or -)
             elif line.startswith('* ') or line.startswith('- '):
-                pdf.set_x(15)
+                current_y = pdf.get_y()
+                pdf.set_xy(15, current_y)
                 pdf.cell(5, 5, chr(149), ln=0) # Bullet character
-                pdf.multi_cell(175, 5, line[2:].strip())
+                pdf.set_xy(20, current_y)
+                pdf.multi_cell(170, 5, line[2:].strip())
             else:
                 pdf.multi_cell(0, 5, line)
 
