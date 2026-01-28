@@ -95,9 +95,6 @@ def create_pdf(ticker, final_state):
         
     return bytes(pdf.output())
 
-# --- UI CONFIG ---
-st.set_page_config(page_title="AI Wall Street Team", layout="wide")
-
 logo = Image.open('picture.png')
 
 st.markdown(
@@ -111,15 +108,26 @@ st.markdown(
             margin-top: -60px;
             width: 100%;
         }
-        .block-container {
-            padding-top: 0;
-        }
     </style>
     """, unsafe_allow_html=True
 )
 
 with st.sidebar:
     st.image(logo)
+
+st.markdown("""
+        <style>
+                .block-container {
+                padding-top: 0;
+                }
+        </style>
+        """, unsafe_allow_html=True)
+
+st.write('')
+st.write('')
+
+# --- 1. SETTINGS & UI ---
+st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 
 st.title("🤖 Multi-Agent AI Wall Street Team 🚀🌕")
 st.markdown("""
@@ -254,17 +262,17 @@ else:
             initial_state = {"ticker": selected_ticker, "data_summary": summary}
             final_state = asyncio.run(graph.ainvoke(initial_state))
 
-            # Store results in session state
+            # Store final state in session for PDF generation button
             st.session_state['final_state'] = final_state
             st.session_state['ticker'] = selected_ticker
             st.session_state['df_1d'] = df_1d
             st.session_state['df_1m'] = df_1m
             st.session_state['df_1y'] = df_1y
 
-    # Display results if they exist in session state (even after download button rerun)
-    if 'final_state' in st.session_state:
-        ticker = st.session_state['ticker']
+    # Check if data exists in session state before rendering
+    if 'final_state' in st.session_state and 'df_1d' in st.session_state:
         final_state = st.session_state['final_state']
+        ticker = st.session_state['ticker']
         df_1d = st.session_state['df_1d']
         df_1m = st.session_state['df_1m']
         df_1y = st.session_state['df_1y']
