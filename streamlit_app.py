@@ -107,6 +107,22 @@ def create_pdf(ticker, final_state):
 # Set page config
 st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 
+# --- CUSTOM CSS FOR BUTTON UNIFORMITY ---
+st.markdown("""
+    <style>
+    /* Ensure sidebar buttons have consistent height and alignment */
+    div[data-testid="stVerticalBlock"] > div:has(button) {
+        align-items: stretch;
+    }
+    .stButton > button {
+        height: 3em; /* Sets a fixed height for both buttons */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 try:
     logo_img = Image.open('picture.png')
     st.markdown(
@@ -146,11 +162,15 @@ with st.sidebar:
     st.header("Settings")
     api_key = st.secrets.get("open_ai_api_key", "")
     selected_ticker = st.text_input("Stock Ticker", value="NVDA").upper()
+    
+    # Updated Column Layout for Buttons
     col1, col2 = st.columns(2)
     with col1:
-        analyze_clicked = st.button("Analyze") 
+        # use_container_width=True makes the button fill the half-column width
+        analyze_clicked = st.button("Analyze", use_container_width=True) 
     with col2:
-        if st.button("Clear Results"):
+        # use_container_width=True ensures symmetry
+        if st.button("Clear Results", use_container_width=True):
             for key in ['final_state', 'ticker', 'df_1d', 'df_1m', 'df_1y']:
                 if key in st.session_state:
                     del st.session_state[key]
@@ -316,5 +336,6 @@ else:
             label="Download PDF Report",
             data=pdf_data,
             file_name=f"{st.session_state['ticker']}_Report.pdf",
-            mime="application/pdf"
+            mime="application/pdf",
+            use_container_width=True # Matched width for the download button too
         )
