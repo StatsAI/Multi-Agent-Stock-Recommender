@@ -32,8 +32,8 @@ def get_financial_data(ticker):
     """Fetches comprehensive multi-horizon data for the agents."""
     stock = yf.Ticker(ticker)
     
-    # 5-Day Granular Data (Short-term)
-    df_5d = stock.history(period="5d", interval="5m")
+    # 1-Day Intraday Data (Short-term)
+    df_1d = stock.history(period="1d", interval="1m")
     # 1-Month Daily Data (Medium-term)
     df_1m = stock.history(period="1mo", interval="1d")
     # 1-Year Daily Data (Long-term)
@@ -43,7 +43,7 @@ def get_financial_data(ticker):
     info = stock.info
     dividends = stock.dividends
     
-    return df_5d, df_1m, df_1y, info, dividends
+    return df_1d, df_1m, df_1y, info, dividends
 
 # --- 3. LANGGRAPH AGENT STATE ---
 class AgentState(TypedDict):
@@ -65,17 +65,17 @@ async def fundamental_node(state: AgentState):
     return {"fundamental_report": res.content}
 
 async def technical_node(state: AgentState):
-    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze the short-term (5m) and medium-term (daily) price action. Calculate virtual RSI/MACD based on the high/low/close data provided. Provide a concrete entry time and exit price. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as a Technical Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze the short-term (intraday) and medium-term (daily) price action. Calculate virtual RSI/MACD based on the high/low/close data provided. Provide a concrete entry time and exit price. Assign a Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"technical_report": res.content}
 
 async def ml_node(state: AgentState):
-    prompt = f"Act as an ML Analyst for {state['ticker']}. Evaluate price patterns across 5-day, 1-month, and 1-year horizons in the provided data summary. State the probability of a price increase tomorrow vs next week. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as an ML Analyst for {state['ticker']}. Evaluate price patterns across 1-day, 1-month, and 1-year horizons in the provided data summary. State the probability of a price increase tomorrow vs next week. Assign a Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"ml_report": res.content}
 
 async def forecasting_node(state: AgentState):
-    prompt = f"Act as a Time Series Forecasting Analyst. Look at the 1-year trend vs the 5-day volatility for {state['ticker']}. Provide a specific price range for the next 48 hours and a forecast for the next 30 days. Assign a Confidence Score (0-100%)."
+    prompt = f"Act as a Time Series Forecasting Analyst. Look at the 1-year trend vs the intraday volatility for {state['ticker']}. Provide a specific price range for the next 48 hours and a forecast for the next 30 days. Assign a Confidence Score (0-100%)."
     res = await llm.ainvoke(prompt)
     return {"forecasting_report": res.content}
 
@@ -118,11 +118,11 @@ if not api_key:
 else:
     if st.button(f"Analyze {selected_ticker}"):
         with st.spinner("Analyzing Short, Medium, and Long-term horizons..."):
-            df_5d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
+            df_1d, df_1m, df_1y, info, dividends = get_financial_data(selected_ticker)
             
             # Charts Displayed Vertically
-            st.caption("5-Day Candle (Short)")
-            fig1 = go.Figure(data=[go.Candlestick(x=df_5d.index, open=df_5d['Open'], high=df_5d['High'], low=df_5d['Low'], close=df_5d['Close'])])
+            st.caption("1-Day Intraday (Short)")
+            fig1 = go.Figure(data=[go.Candlestick(x=df_1d.index, open=df_1d['Open'], high=df_1d['High'], low=df_1d['Low'], close=df_1d['Close'])])
             fig1.update_layout(template="plotly_dark", xaxis_rangeslider_visible=False, height=400, margin=dict(l=0,r=0,b=0,t=0))
             st.plotly_chart(fig1, use_container_width=True)
 
@@ -141,7 +141,7 @@ else:
             summary = (f"TICKER: {selected_ticker}\n"
                        f"INFO: P/E: {info.get('trailingPE')}, Mkt Cap: {info.get('marketCap')}, Div Yield: {info.get('dividendYield')}\n"
                        f"DIVIDENDS (Recent): {div_summary}\n"
-                       f"5D CLOSE: {df_5d['Close'].iloc[-1]:.2f}\n"
+                       f"1D CLOSE: {df_1d['Close'].iloc[-1]:.2f}\n"
                        f"1M RANGE: {df_1m['Low'].min():.2f} - {df_1m['High'].max():.2f}\n"
                        f"1Y TREND: Start {df_1y['Close'].iloc[0]:.2f} to End {df_1y['Close'].iloc[-1]:.2f}")
 
