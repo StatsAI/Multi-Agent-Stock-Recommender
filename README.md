@@ -8,7 +8,7 @@
 ## 3. Pressing the download pdf report auto generates and downloads a pdf report, enabling further review!
 ## 4. Pressing the explainer button auto generates an explanation of how the AI system works along with an architecture diagram!
 
-<img width="935" height="460" alt="image" src="https://github.com/user-attachments/assets/73cc76cd-f2d8-4dc8-b0ad-b9a62b0536a2" />
+<img width="908" height="470" alt="image" src="https://github.com/user-attachments/assets/0045ae89-0e02-4dd2-b7b4-25694d9a8f9c" />
 
 <img width="929" height="438" alt="image" src="https://github.com/user-attachments/assets/e59c057b-7c80-4ce7-9e4a-6ad4fbedea60" />
 
