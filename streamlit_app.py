@@ -50,9 +50,9 @@ st.set_page_config(page_title="AI Wall Street Team", layout="wide")
 
 st.title("🤖 Multi-Agent AI Wall Street Team")
 st.markdown("""
-This app use LangGraph to create a team of specialized AI agents working for a supervisor.  
+This app use LangGraph to create a team of specialized AI agents running in parallel reporting to a supervisor agent.  
 
-The team analyzes **Short, Medium, and Long-term horizons** to provide a weighted recommendation to buy/hold/sell.
+The team analyzes short, medium, and long-term horizons to provide a weighted recommendation to buy/hold/sell.
 """)
 
 # Sidebar for Configuration
