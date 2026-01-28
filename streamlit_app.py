@@ -52,7 +52,7 @@ st.title("🤖 Multi-Agent AI Wall Street Team")
 st.markdown("""
 This app use LangGraph to create a team of specialized AI agents working for a supervisor.  
 
-The team analyzes **Short, Medium, and Long-term horizons** to provide a weighted recommendation for multiple time horizons.
+The team analyzes **Short, Medium, and Long-term horizons** to provide a weighted recommendation to buy/hold/sell.
 """)
 
 # Sidebar for Configuration
