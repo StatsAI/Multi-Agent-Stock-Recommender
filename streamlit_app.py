@@ -42,19 +42,45 @@ def create_pdf(ticker, final_state):
                              spaceAfter=12,
                              spaceBefore=12,
                              backColor='#f0f0f0'))
+    styles.add(ParagraphStyle(name='BulletPoint',
+                             parent=styles['BodyText'],
+                             leftIndent=20,
+                             bulletIndent=10,
+                             spaceAfter=6))
     
     # Title
     title = Paragraph(f"AI Wall Street Report: {ticker}", styles['CustomTitle'])
     elements.append(title)
     elements.append(Spacer(1, 12))
     
+    def format_content(content):
+        """Convert content with bullet points to proper formatting"""
+        lines = content.split('\n')
+        formatted_elements = []
+        
+        for line in lines:
+            line = line.strip()
+            if not line:
+                formatted_elements.append(Spacer(1, 6))
+                continue
+            
+            # Handle headers (###)
+            if line.startswith('###'):
+                header_text = line.replace('###', '').strip()
+                formatted_elements.append(Paragraph(f"<b>{header_text}</b>", styles['BodyText']))
+            # Handle bullet points
+            elif line.startswith('* ') or line.startswith('- '):
+                bullet_text = line[2:].strip()
+                formatted_elements.append(Paragraph(f"• {bullet_text}", styles['BulletPoint']))
+            else:
+                formatted_elements.append(Paragraph(line, styles['BodyText']))
+        
+        return formatted_elements
+    
     # Executive Recommendation Section
     exec_header = Paragraph("EXECUTIVE MULTI-HORIZON RECOMMENDATION", styles['SectionHeader'])
     elements.append(exec_header)
-    
-    exec_text = final_state['final_recommendation'].replace('\n', '<br/>')
-    exec_para = Paragraph(exec_text, styles['BodyText'])
-    elements.append(exec_para)
+    elements.extend(format_content(final_state['final_recommendation']))
     elements.append(Spacer(1, 20))
     
     # Agent Sections
@@ -69,10 +95,7 @@ def create_pdf(ticker, final_state):
     for title, key in reports.items():
         section_header = Paragraph(title, styles['SectionHeader'])
         elements.append(section_header)
-        
-        content = final_state[key].replace('\n', '<br/>')
-        section_para = Paragraph(content, styles['BodyText'])
-        elements.append(section_para)
+        elements.extend(format_content(final_state[key]))
         elements.append(Spacer(1, 20))
     
     # Build PDF
