@@ -48,6 +48,13 @@ class AgentState(TypedDict):
 
 # --- 3. PARALLEL NODES ---
 # Using gpt-5-mini for high-speed reasoning
+
+with st.sidebar:
+    #api_key = st.text_input("OpenAI API Key", type="password")
+    api_key = st.secrets["open_ai_api_key"]
+    ticker = st.text_input("Ticker", value="AAPL").upper()
+    os.environ["OPENAI_API_KEY"] = api_key
+
 llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
 
 def fundamental_node(state: AgentState):
@@ -98,12 +105,6 @@ graph = builder.compile()
 
 # --- 5. STREAMLIT UI ---
 st.title("⚡ 60-Second Stock Intelligence")
-
-with st.sidebar:
-    #api_key = st.text_input("OpenAI API Key", type="password")
-    api_key = st.secrets["open_ai_api_key"]
-    ticker = st.text_input("Ticker", value="AAPL").upper()
-    os.environ["OPENAI_API_KEY"] = api_key
 
 if st.button("Generate Report") and api_key:
     with st.spinner("Executing parallel analysis..."):
