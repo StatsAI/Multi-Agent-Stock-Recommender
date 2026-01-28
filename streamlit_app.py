@@ -334,59 +334,66 @@ else:
             use_container_width=True
         )
         
-        # --- NEW EXPLAINER BUTTON ---
+        # --- EXPLAINER SECTION ---
         if st.sidebar.button("Explain how the app works!", use_container_width=True):
             st.divider()
-            st.header("System Architecture: Agentic Financial Team")
+            st.header("App Architecture & Agentic Workflow")
             
-            col_expl, col_diag = st.columns([1, 1.2])
-            
-            with col_expl:
-                st.subheader("Process Overview")
-                st.markdown("""
-                This system uses an **Agentic AI Mesh** powered by LangGraph to mimic a professional investment committee.
+            # 1. Logical Architecture (Diagram) First
+            st.subheader("1. Logical Architecture")
+            mermaid_code = """
+            graph TD
+                U[User Input] -->|Ticker| DI[Data Ingestion Node]
+                DI -->|Price/Info| S{Agent State}
                 
-                * **Specialized Analysis**: Instead of one general prompt, we deploy five distinct agents. Each uses a specialized persona and mathematical context.
-                * **Parallel Workflow**: The agents run concurrently, significantly reducing latency while ensuring independent bias-free reporting.
-                * **Stateful Memory**: A central `AgentState` object tracks every insight, which is then passed to the Supervisor.
-                * **Executive Synthesis**: The Supervisor (CIO) performs 'Agent Fusion', resolving contradictions between technical and fundamental signals to generate a final decision.
-                """)
-            
-            with col_diag:
-                st.subheader("Logical Architecture")
-                mermaid_code = """
-                graph TD
-                    User([User Input: Ticker]) --> Data[YFinance Data Ingestion]
-                    Data --> State{AgentState}
-                    
-                    subgraph Parallel_Agents [Analyst Team]
-                        State --> Fund[Fundamental Agent]
-                        State --> Tech[Technical Agent]
-                        State --> ML[ML Pattern Agent]
-                        State --> Forecast[Forecasting Agent]
-                        State --> News[Sentiment Agent]
-                    end
-                    
-                    Fund --> Supervisor
-                    Tech --> Supervisor
-                    ML --> Supervisor
-                    Forecast --> Supervisor
-                    News --> Supervisor
-                    
-                    Supervisor{{Supervisor: CIO Synthesis}} --> Final[/Final Multi-Horizon Strategy/]
-                    
-                    style Parallel_Agents fill:#f5f5f5,stroke:#666,stroke-dasharray: 5 5
-                    style Supervisor fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-                    style Final fill:#c8e6c9,stroke:#2e7d32
-                """
+                subgraph Analysts [Parallel Analysis Layer]
+                    S --> FA[Fundamental Agent]
+                    S --> TA[Technical Agent]
+                    S --> ML[ML Agent]
+                    S --> TSA[Forecasting Agent]
+                    S --> SA[News/Sentiment Agent]
+                end
                 
-                html_code = f"""
-                <div class="mermaid" style="background-color: white; padding: 10px; border-radius: 10px;">
-                    {mermaid_code}
-                </div>
-                <script type="module">
-                    import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-                    mermaid.initialize({{ startOnLoad: true, theme: 'neutral' }});
-                </script>
-                """
-                components.html(html_code, height=600)
+                FA -->|Report| SUP[Supervisor: CIO Agent]
+                TA -->|Report| SUP
+                ML -->|Report| SUP
+                TSA -->|Report| SUP
+                SA -->|Report| SUP
+                
+                SUP -->|Final Synthesis| OUT[Multi-Horizon Strategy]
+                
+                style S fill:#f9f,stroke:#333,stroke-width:2px
+                style Analysts fill:#f0f0f0,stroke:#666,stroke-dasharray: 5 5
+                style SUP fill:#4b0082,color:#fff,stroke-width:2px
+                style OUT fill:#00c853,color:#fff
+            """
+            
+            html_code = f"""
+            <div class="mermaid" style="background-color: white; padding: 20px; border-radius: 15px; border: 1px solid #ddd;">
+                {mermaid_code}
+            </div>
+            <script type="module">
+                import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+                mermaid.initialize({{ startOnLoad: true, theme: 'forest' }});
+            </script>
+            """
+            components.html(html_code, height=550)
+
+            # 2. Detailed Process Overview
+            st.subheader("2. Process Overview")
+            st.markdown("""
+            1. **Data Ingestion & Normalization**: The system triggers `yfinance` to fetch real-time intraday (1m), monthly (1d), and yearly (1d) price data. It also extracts key-value pairs from the company's financial info (PE ratio, Market Cap, etc.) to create a structured **Data Summary**.
+            
+            2. **The LangGraph State Machine**: A specialized `AgentState` object is initialized. This acts as the "shared memory" for the entire system, ensuring that every agent has access to the same raw data while contributing their specific analysis back to the pool.
+            
+            3. **Parallel Multi-Agent Execution**:
+                * **Fundamental Agent**: Deep-dives into long-term valuation and company health.
+                * **Technical Agent**: Calculates RSI, SMA crossovers, and momentum indicators.
+                * **ML Agent**: Uses pattern recognition to identify historical price-action clusters.
+                * **Forecasting Agent**: Acts as a time-series expert to project potential price ranges.
+                * **News Agent**: Evaluates macro-sentiment and recent headline impact.
+            
+            4. **Conflict Resolution & Synthesis**: Each agent produces a report with a **Confidence Score**. The **Supervisor (CIO) Agent** reviews these five reports. If the Technical Agent is "Bullish" but the Fundamental Agent is "Bearish," the Supervisor weighs the evidence based on the investment horizon to provide a balanced final verdict.
+            
+            5. **Final Output Generation**: The final strategy is rendered in the UI and converted into a professional PDF report using `ReportLab`, complete with executive summaries and detailed analyst breakdowns.
+            """)
