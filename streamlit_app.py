@@ -208,7 +208,7 @@ class AgentState(TypedDict):
     final_recommendation: str
 
 # --- 4. ASYNC AGENT NODES ---
-llm = ChatOpenAI(model="gpt-5-mini", temperature=0)
+llm = ChatOpenAI(model="gpt-5", temperature=0)
 
 async def fundamental_node(state: AgentState):
     prompt = f"Act as a Fundamental Analyst for {state['ticker']}. Data context: {state['data_summary']}. Analyze long-term health. Position with Confidence Score (0-100%)."
